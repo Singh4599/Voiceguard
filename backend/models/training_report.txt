@@ -1,0 +1,61 @@
+VoiceGuard — Voice Cloning Detection Model Training Report
+============================================================
+Best Model    : RandomForest
+Best AUC      : 1.0000
+Training Samples : 496
+Test Samples  : 124
+
+
+────────────────────────────────────────
+Model: RandomForest
+Accuracy : 0.9839
+AUC      : 1.0000
+CV AUC   : 1.0000 ± 0.0000
+
+Classification Report:
+              precision    recall  f1-score   support
+
+        real       1.00      0.95      0.97        40
+    ai_clone       0.98      1.00      0.99        84
+
+    accuracy                           0.98       124
+   macro avg       0.99      0.97      0.98       124
+weighted avg       0.98      0.98      0.98       124
+
+Confusion Matrix: [[38, 2], [0, 84]]
+
+────────────────────────────────────────
+Model: GradientBoosting
+Accuracy : 0.9839
+AUC      : 0.9741
+CV AUC   : 0.9923 ± 0.0095
+
+Classification Report:
+              precision    recall  f1-score   support
+
+        real       1.00      0.95      0.97        40
+    ai_clone       0.98      1.00      0.99        84
+
+    accuracy                           0.98       124
+   macro avg       0.99      0.97      0.98       124
+weighted avg       0.98      0.98      0.98       124
+
+Confusion Matrix: [[38, 2], [0, 84]]
+
+────────────────────────────────────────
+Model: NeuralNetwork
+Accuracy : 0.9839
+AUC      : 1.0000
+CV AUC   : 0.9965 ± 0.0026
+
+Classification Report:
+              precision    recall  f1-score   support
+
+        real       1.00      0.95      0.97        40
+    ai_clone       0.98      1.00      0.99        84
+
+    accuracy                           0.98       124
+   macro avg       0.99      0.97      0.98       124
+weighted avg       0.98      0.98      0.98       124
+
+Confusion Matrix: [[38, 2], [0, 84]]

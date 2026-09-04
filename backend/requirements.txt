@@ -1,0 +1,28 @@
+# VoiceGuard — Python dependencies
+#
+# Phase 1: Real-time audio pipeline
+# Phase 2: AI voice cloning detection
+
+# Web framework + ASGI server
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+
+# WebSocket client library
+websockets>=12.0
+
+# .env file support
+python-dotenv>=1.0.0
+
+# ── Phase 2: AI / ML ──────────────────────────────────────────────────────
+# Local Whisper (open-source speech-to-text, runs offline)
+openai-whisper
+
+# Audio feature extraction (MFCC, pitch, spectral features)
+librosa
+
+# ML classifiers (RandomForest, MLP, GradientBoosting)
+scikit-learn
+
+# Numerical computing
+numpy
+scipy
