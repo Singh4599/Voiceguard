@@ -33,6 +33,7 @@ from app.exotel.parser import (
     parse_event,
 )
 from app.sessions.manager import CallSession, session_manager
+from app.ai.pipeline import cleanup_call
 
 logger = logging.getLogger(__name__)
 
@@ -242,3 +243,6 @@ async def _finalise_call(call_id: str) -> None:
             "[CALL STOP] call_id=%s — no audio received, no WAV written",
             call_id,
         )
+
+    # Tell the dashboard the call ended
+    cleanup_call(call_id)
