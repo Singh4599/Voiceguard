@@ -1,0 +1,60 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environment
+venv/
+env/
+.venv/
+
+# Environment variables
+.env
+.env.*
+
+# Training data (too large for git — regenerate with generate_data.py)
+backend/training_data/real/
+backend/training_data/fake/
+
+# Recordings & chunks (private call data)
+backend/recordings/
+backend/chunks/
+
+# Trained models (binary — regenerate with train.py)
+backend/models/*.pkl
+
+# Test output
+backend/test_output/
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Cloudflare tunnel credentials
+.cloudflared/
+
+# Large audio files
+*.wav
+*.mp3
+*.ogg
+
+# But KEEP the models directory itself and training_data structure
+!backend/models/.gitkeep
+!backend/training_data/.gitkeep
+!backend/training_data/real/.gitkeep
+!backend/training_data/fake/.gitkeep
+!backend/recordings/.gitkeep
+!backend/chunks/.gitkeep

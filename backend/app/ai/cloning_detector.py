@@ -143,14 +143,19 @@ class CloningDetector:
             proba = self._model.predict_proba(features_scaled)[0]
             ml_proba = float(proba[1])  # class 1 = AI clone
 
-            # Combine: Take the max of ML probability and Heuristic score
-            # This ensures if the ML model misses an advanced AI voice, 
-            # acoustic forensics (jitter/shimmer) can still catch it.
-            final_proba = max(ml_proba, heuristic_result.confidence)
-            
+            # Combine: Weighted blend — trust ML (80%) primary, heuristic (20%) secondary.
+            # Heuristic only adds meaningful weight when ML ALSO suspects something.
+            # This prevents phone-network compression artifacts from causing false positives.
+            if ml_proba >= 0.35:
+                # Both agree there's something suspicious — heuristic gets more weight
+                final_proba = 0.7 * ml_proba + 0.3 * heuristic_result.confidence
+            else:
+                # ML says real — heuristic can only nudge slightly, not override
+                final_proba = 0.85 * ml_proba + 0.15 * heuristic_result.confidence
+
             is_clone = final_proba >= 0.5
             risk = _confidence_to_risk(final_proba)
-            
+
             # Use ML indicators if ML was higher, else heuristic indicators
             if ml_proba >= heuristic_result.confidence:
                 indicators = self._get_top_indicators(features, ml_proba)
@@ -164,12 +169,12 @@ class CloningDetector:
                 features_extracted=True,
                 top_indicators=indicators,
                 raw_scores={
-                    "ml_prob": ml_proba, 
+                    "ml_prob": ml_proba,
                     "heuristic_score": heuristic_result.confidence,
                     "final_prob": final_proba
                 },
             )
-            logger.info("[DETECTOR] %s (ML: %.2f, Heuristic: %.2f)", 
+            logger.info("[DETECTOR] %s (ML: %.2f, Heuristic: %.2f)",
                         result, ml_proba, heuristic_result.confidence)
             return result
 
@@ -208,33 +213,36 @@ class CloningDetector:
                                    ["Insufficient features for heuristic"])
 
         # Check 1: Pitch jitter (index 50) — AI voices have very low jitter
+        # Threshold tightened: phone PCMU compression also reduces jitter,
+        # so only flag extreme cases (< 0.003, not < 0.01)
         jitter = features[50]
-        if jitter < 0.01:
-            score += 0.25
-            indicators.append(f"Unnaturally low pitch jitter ({jitter:.4f})")
+        if jitter < 0.003:
+            score += 0.30
+            indicators.append(f"Low pitch jitter (AI signature): {jitter:.4f}")
 
         # Check 2: Pitch std (index 47) — AI voices monotone
+        # Tightened: phone audio can naturally have low pitch std in quiet segments
         pitch_std = features[47]
-        if pitch_std < 10.0 and features[46] > 0:  # has pitch but low variation
-            score += 0.25
-            indicators.append(f"Monotone pitch (std={pitch_std:.1f} Hz)")
+        if pitch_std < 3.0 and features[46] > 60:  # has clear pitch but VERY monotone
+            score += 0.30
+            indicators.append(f"Monotone pitch: {pitch_std:.1f} Hz variation")
 
         # Check 3: Spectral flux (index 42) — AI voices very smooth
         flux = features[42]
-        if flux < 0.001:
-            score += 0.2
+        if flux < 0.0005:  # tightened from 0.001
+            score += 0.20
             indicators.append(f"Unnaturally smooth spectrum (flux={flux:.6f})")
 
         # Check 4: Shimmer (index 51) — AI voices have constant amplitude
         shimmer = features[51]
-        if shimmer < 0.05:
+        if shimmer < 0.01:  # tightened from 0.05 — phone audio has natural shimmer
             score += 0.15
-            indicators.append(f"Constant amplitude (shimmer={shimmer:.3f})")
+            indicators.append(f"Unnatural amplitude consistency")
 
-        # Check 5: MFCC-delta (index 13) — AI has smoother transitions
+        # Check 5: MFCC-delta — AI has smoother transitions
         mfcc_delta_mean = np.abs(features[13:26]).mean()
-        if mfcc_delta_mean < 2.0:
-            score += 0.15
+        if mfcc_delta_mean < 0.5:  # tightened from 2.0 — phone audio naturally smooth
+            score += 0.05
             indicators.append(f"Unnatural speech transitions (MFCC-Δ={mfcc_delta_mean:.2f})")
 
         score = min(score, 1.0)
