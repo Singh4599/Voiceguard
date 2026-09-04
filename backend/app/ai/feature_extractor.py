@@ -35,6 +35,16 @@ from typing import Optional
 import librosa
 import numpy as np
 
+# Praat-grade jitter/shimmer via parselmouth (optional but highly recommended)
+try:
+    # pyrefly: ignore [missing-import]
+    import parselmouth
+    # pyrefly: ignore [missing-import]
+    from parselmouth.praat import call as praat_call
+    PRAAT_AVAILABLE = True
+except ImportError:
+    PRAAT_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 # Number of MFCC coefficients to extract
@@ -60,6 +70,14 @@ def extract_features(wav_bytes: bytes) -> Optional[np.ndarray]:
         y, sr = _load_wav_bytes(wav_bytes)
         if y is None or len(y) < 512:
             logger.warning("[FEATURES] Audio too short to extract features")
+            return None
+
+        # ── Voice Activity Detection (VAD) ──
+        # Silence/phone static has ~0 pitch and shimmer, causing false AI flags.
+        # Skip extraction if audio is practically silent.
+        rms = librosa.feature.rms(y=y).mean()
+        if rms < 0.005:
+            logger.info("[FEATURES] Audio is silent (RMS=%.4f). Skipping.", rms)
             return None
 
         # Resample to standard rate if needed
@@ -150,11 +168,85 @@ def _zcr_rms_features(y: np.ndarray) -> np.ndarray:
 
 def _pitch_features(y: np.ndarray, sr: int) -> np.ndarray:
     """
-    Pitch (F0) statistics → 6 values.
+    Pitch (F0) + Praat-grade Jitter/Shimmer → 6 values.
 
-    Real voices:  higher jitter, shimmer, pitch variation
-    AI voices:    smoother, more consistent pitch
+    Uses parselmouth (Python Praat) for clinically-validated jitter/shimmer.
+    This is the GOLD STANDARD used in forensic voice analysis.
+
+    AI voices (simple TTS): jitter < 0.001, shimmer < 0.01
+    AI voices (ElevenLabs): jitter > 0.018, shimmer > 0.06 (over-injected)
+    Human voice:            jitter 0.003-0.015, shimmer 0.02-0.06
     """
+    # ── Praat path (parselmouth installed) ───────────────────────────────
+    try:
+        if not PRAAT_AVAILABLE:
+            raise RuntimeError("parselmouth not installed")
+
+        sound = parselmouth.Sound(y, sampling_frequency=float(sr))
+
+        # Extract pitch via autocorrelation (robust on 8kHz phone audio)
+        pitch_obj = praat_call(
+            sound, "To Pitch (ac)",
+            0.0,    # time step (auto)
+            75.0,   # min pitch Hz
+            600.0,  # max pitch Hz
+            False,  # very accurate
+            0.03,   # silence threshold
+            0.45,   # voicing threshold
+            0.01,   # octave cost
+            0.35,   # octave-jump cost
+            0.14,   # voiced/unvoiced cost
+            500.0,  # max candidates
+        )
+
+        # Collect voiced F0 values safely
+        times = pitch_obj.xs()
+        f0_values = []
+        for t in times:
+            v = pitch_obj.get_value_at_time(t)
+            if v is not None and not (isinstance(v, float) and np.isnan(v)):
+                f0_values.append(float(v))
+
+        if len(f0_values) < 4:
+            return np.zeros(6, dtype=np.float32)
+
+        f0_arr = np.array(f0_values, dtype=np.float32)
+        f0_mean = float(f0_arr.mean())
+        f0_std = float(f0_arr.std())
+        f0_range = float(f0_arr.max() - f0_arr.min())
+        voiced_ratio = float(len(f0_values)) / float(max(len(times), 1))
+
+        # Praat PointProcess for jitter/shimmer
+        point_process = praat_call(sound, "To PointProcess (periodic, cc)", 75.0, 600.0)
+
+        # Jitter (local) — AI voices: ~0.000 or >0.018 (over-injected)
+        try:
+            jitter = praat_call(point_process, "Get jitter (local)", 0.0, 0.0, 0.0001, 0.02, 1.3)
+            jitter = float(jitter) if jitter is not None else 0.0
+            if np.isnan(jitter):
+                jitter = 0.0
+        except Exception:
+            jitter = 0.0
+
+        # Shimmer (local) — AI voices: ~0.000 or >0.06 (over-injected)
+        try:
+            shimmer = praat_call(
+                [sound, point_process], "Get shimmer (local)",
+                0.0, 0.0, 0.0001, 0.02, 1.3, 1.6
+            )
+            shimmer = float(shimmer) if shimmer is not None else 0.0
+            if np.isnan(shimmer):
+                shimmer = 0.0
+        except Exception:
+            shimmer = 0.0
+
+        return np.array([f0_mean, f0_std, f0_range, voiced_ratio, jitter, shimmer],
+                        dtype=np.float32)
+
+    except Exception:
+        pass  # Fall through to librosa fallback
+
+    # ── Fallback: librosa approximation if parselmouth fails ─────────────
     try:
         f0, voiced_flag, _ = librosa.pyin(
             y,
@@ -163,27 +255,22 @@ def _pitch_features(y: np.ndarray, sr: int) -> np.ndarray:
             sr=sr,
         )
         f0_voiced = f0[voiced_flag & ~np.isnan(f0)]
-
         if len(f0_voiced) < 4:
             return np.zeros(6, dtype=np.float32)
-
-        voiced_ratio = voiced_flag.mean()
-        f0_mean = f0_voiced.mean()
-        f0_std = f0_voiced.std()
-        f0_range = f0_voiced.max() - f0_voiced.min()
-
-        # Jitter: cycle-to-cycle pitch variation (simplified)
+        f0_mean = float(f0_voiced.mean())
+        f0_std = float(f0_voiced.std())
+        f0_range = float(f0_voiced.max() - f0_voiced.min())
+        voiced_ratio = float(voiced_flag.mean())
         diffs = np.abs(np.diff(f0_voiced))
-        jitter = diffs.mean() / (f0_mean + 1e-8)
-
-        # Shimmer: amplitude variation alongside pitch
+        jitter = float(diffs.mean() / (f0_mean + 1e-8))
         amplitude = np.abs(y)
-        shimmer = amplitude.std() / (amplitude.mean() + 1e-8)
-
-        return np.array([f0_mean, f0_std, f0_range, float(voiced_ratio),
-                          jitter, shimmer])
+        shimmer = float(amplitude.std() / (amplitude.mean() + 1e-8))
+        return np.array([f0_mean, f0_std, f0_range, voiced_ratio, jitter, shimmer],
+                        dtype=np.float32)
     except Exception:
         return np.zeros(6, dtype=np.float32)
+
+
 
 
 def _chroma_features(y: np.ndarray, sr: int) -> np.ndarray:

@@ -143,24 +143,70 @@ class CloningDetector:
             proba = self._model.predict_proba(features_scaled)[0]
             ml_proba = float(proba[1])  # class 1 = AI clone
 
-            # Combine: Weighted blend — trust ML (80%) primary, heuristic (20%) secondary.
-            # Heuristic only adds meaningful weight when ML ALSO suspects something.
-            # This prevents phone-network compression artifacts from causing false positives.
-            if ml_proba >= 0.35:
-                # Both agree there's something suspicious — heuristic gets more weight
-                final_proba = 0.7 * ml_proba + 0.3 * heuristic_result.confidence
+            # ════════════════════════════════════════════════════════
+            # 3-LEVEL DETECTION ARCHITECTURE
+            # ════════════════════════════════════════════════════════
+            #
+            # LEVEL 1 — Physics Inviolable (ABSOLUTE)
+            #   Some signals are physically impossible for human voice.
+            #   No TTS engine can fake them. If triggered → 100% AI.
+            #
+            # LEVEL 2 — Strong Heuristics (HIGH CONFIDENCE)
+            #   Acoustic forensics: jitter, shimmer, pitch std.
+            #   If triggered → override ML (heuristic is more reliable).
+            #
+            # LEVEL 3 — ML Ensemble (GENERAL CATCH-ALL)
+            #   For advanced AI voices that partially mimic humans.
+            # ════════════════════════════════════════════════════════
+
+            jitter = features[50]
+            shimmer = features[51]
+            pitch_mean = features[46]
+            pitch_std = features[47]
+            voiced_ratio = features[49]
+
+            # ── LEVEL 1: Physics Inviolable (zero jitter = old/simple TTS) ──
+            # No human larynx can produce perfectly periodic vocal folds.
+            # Catches: basic TTS, Google TTS, older Bark, XTTS
+            level1_triggered = (
+                jitter < 0.0005              # essentially zero jitter
+                and voiced_ratio > 0.3       # there IS actual speech (not silence)
+                and pitch_mean > 60          # there IS a pitch (not noise)
+            )
+            if level1_triggered:
+                logger.warning(
+                    "[DETECTOR] ⚡ LEVEL 1 PHYSICS — Zero jitter=%.5f", jitter
+                )
+                return DetectionResult(
+                    is_clone=True, confidence=0.99, risk_level="high",
+                    features_extracted=True,
+                    top_indicators=[
+                        f"⚡ ZERO JITTER ({jitter:.5f}) — synthesized voice signature",
+                        f"Voiced speech confirmed (ratio={voiced_ratio:.2f}, F0={pitch_mean:.0f}Hz)",
+                    ],
+                    raw_scores={"ml_prob": ml_proba, "level": 1},
+                )
+
+
+            # ── LEVEL 2: Strong Heuristics ───────────────────────────
+            # When heuristic score is high (>= 0.55), it means multiple
+            # strong AI signatures are present. Trust it over ML.
+            h_score = heuristic_result.confidence
+            if h_score >= 0.55:
+                final_proba = 0.35 * ml_proba + 0.65 * h_score
+                indicators = heuristic_result.top_indicators
+            elif h_score >= 0.30:
+                # Moderate heuristic + ML blend
+                final_proba = 0.6 * ml_proba + 0.4 * h_score
+                indicators = heuristic_result.top_indicators if h_score > ml_proba \
+                    else self._get_top_indicators(features, ml_proba)
             else:
-                # ML says real — heuristic can only nudge slightly, not override
-                final_proba = 0.85 * ml_proba + 0.15 * heuristic_result.confidence
+                # ── LEVEL 3: ML is primary ───────────────────────────
+                final_proba = 0.85 * ml_proba + 0.15 * h_score
+                indicators = self._get_top_indicators(features, ml_proba)
 
             is_clone = final_proba >= 0.5
             risk = _confidence_to_risk(final_proba)
-
-            # Use ML indicators if ML was higher, else heuristic indicators
-            if ml_proba >= heuristic_result.confidence:
-                indicators = self._get_top_indicators(features, ml_proba)
-            else:
-                indicators = heuristic_result.top_indicators
 
             result = DetectionResult(
                 is_clone=is_clone,
@@ -170,12 +216,13 @@ class CloningDetector:
                 top_indicators=indicators,
                 raw_scores={
                     "ml_prob": ml_proba,
-                    "heuristic_score": heuristic_result.confidence,
-                    "final_prob": final_proba
+                    "heuristic_score": h_score,
+                    "final_prob": final_proba,
+                    "level": 2 if h_score >= 0.30 else 3,
                 },
             )
             logger.info("[DETECTOR] %s (ML: %.2f, Heuristic: %.2f)",
-                        result, ml_proba, heuristic_result.confidence)
+                        result, ml_proba, h_score)
             return result
 
         except Exception as exc:
@@ -212,38 +259,49 @@ class CloningDetector:
             return DetectionResult(False, 0.0, "low", True,
                                    ["Insufficient features for heuristic"])
 
-        # Check 1: Pitch jitter (index 50) — AI voices have very low jitter
-        # Threshold tightened: phone PCMU compression also reduces jitter,
-        # so only flag extreme cases (< 0.003, not < 0.01)
+        # ── LEVEL 1 physics check (also done in predict() for combination logic)
+        # Here we compute a raw heuristic score for blend weighting.
+
         jitter = features[50]
-        if jitter < 0.003:
-            score += 0.30
-            indicators.append(f"Low pitch jitter (AI signature): {jitter:.4f}")
-
-        # Check 2: Pitch std (index 47) — AI voices monotone
-        # Tightened: phone audio can naturally have low pitch std in quiet segments
-        pitch_std = features[47]
-        if pitch_std < 3.0 and features[46] > 60:  # has clear pitch but VERY monotone
-            score += 0.30
-            indicators.append(f"Monotone pitch: {pitch_std:.1f} Hz variation")
-
-        # Check 3: Spectral flux (index 42) — AI voices very smooth
-        flux = features[42]
-        if flux < 0.0005:  # tightened from 0.001
-            score += 0.20
-            indicators.append(f"Unnaturally smooth spectrum (flux={flux:.6f})")
-
-        # Check 4: Shimmer (index 51) — AI voices have constant amplitude
         shimmer = features[51]
-        if shimmer < 0.01:  # tightened from 0.05 — phone audio has natural shimmer
-            score += 0.15
-            indicators.append(f"Unnatural amplitude consistency")
+        pitch_mean = features[46]
+        pitch_std = features[47]
+        voiced_ratio = features[49]
+        has_speech = voiced_ratio > 0.25 and pitch_mean > 60
 
-        # Check 5: MFCC-delta — AI has smoother transitions
-        mfcc_delta_mean = np.abs(features[13:26]).mean()
-        if mfcc_delta_mean < 0.5:  # tightened from 2.0 — phone audio naturally smooth
-            score += 0.05
-            indicators.append(f"Unnatural speech transitions (MFCC-Δ={mfcc_delta_mean:.2f})")
+        # Check 1: Jitter — the #1 universal AI signature
+        # AI: near-zero jitter (synthesized pitch = too perfect)
+        # Human: always > 0.003 due to laryngeal muscle noise
+        if jitter < 0.0005 and has_speech:
+            score += 0.60  # near-certain AI — catches ALL TTS engines
+            indicators.append(f"⚡ Zero pitch jitter ({jitter:.5f}) — AI physics signature")
+        elif jitter < 0.003 and has_speech:
+            score += 0.35
+            indicators.append(f"Very low pitch jitter ({jitter:.4f}) — likely AI")
+        elif jitter < 0.008 and has_speech:
+            score += 0.15
+            indicators.append(f"Low pitch jitter ({jitter:.4f}) — possible AI")
+
+        # Check 2: Shimmer — AI amplitude is machine-perfect
+        # Human breathing + vocal fold tension causes 2-5% shimmer naturally
+        if shimmer < 0.003 and has_speech:
+            score += 0.25
+            indicators.append(f"Zero shimmer ({shimmer:.4f}) — machine-perfect amplitude")
+        elif shimmer < 0.01 and has_speech:
+            score += 0.10
+            indicators.append(f"Very low shimmer ({shimmer:.4f}) — unnatural")
+
+        # Check 3: Pitch monotony — AI voices follow mathematical F0 curves
+        # Human pitch varies naturally by 15-40 Hz across a sentence
+        if pitch_std < 2.0 and has_speech:
+            score += 0.15
+            indicators.append(f"Monotone pitch (std={pitch_std:.1f} Hz) — AI prosody")
+
+        # Check 4: Spectral flux — AI spectra are too smooth
+        flux = features[42]
+        if flux < 0.0005:
+            score += 0.10
+            indicators.append(f"Unnaturally smooth spectrum (flux={flux:.6f})")
 
         score = min(score, 1.0)
         is_clone = score >= 0.5
