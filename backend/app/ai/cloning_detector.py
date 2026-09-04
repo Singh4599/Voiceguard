@@ -131,29 +131,46 @@ class CloningDetector:
 
         features_2d = features.reshape(1, -1)
 
-        # Step 2: Fallback to heuristic if model not trained yet
-        if not self._loaded:
-            return self._heuristic_predict(features)
+        # Step 2: Calculate heuristic score for zero-day AI models
+        heuristic_result = self._heuristic_predict(features)
 
-        # Step 3: Scale + predict
+        # Step 3: Combine with ML model if loaded
+        if not self._loaded:
+            return heuristic_result
+
         try:
             features_scaled = self._scaler.transform(features_2d)
             proba = self._model.predict_proba(features_scaled)[0]
-            clone_proba = float(proba[1])  # class 1 = AI clone
+            ml_proba = float(proba[1])  # class 1 = AI clone
 
-            is_clone = clone_proba >= 0.5
-            risk = _confidence_to_risk(clone_proba)
-            indicators = self._get_top_indicators(features, clone_proba)
+            # Combine: Take the max of ML probability and Heuristic score
+            # This ensures if the ML model misses an advanced AI voice, 
+            # acoustic forensics (jitter/shimmer) can still catch it.
+            final_proba = max(ml_proba, heuristic_result.confidence)
+            
+            is_clone = final_proba >= 0.5
+            risk = _confidence_to_risk(final_proba)
+            
+            # Use ML indicators if ML was higher, else heuristic indicators
+            if ml_proba >= heuristic_result.confidence:
+                indicators = self._get_top_indicators(features, ml_proba)
+            else:
+                indicators = heuristic_result.top_indicators
 
             result = DetectionResult(
                 is_clone=is_clone,
-                confidence=clone_proba,
+                confidence=final_proba,
                 risk_level=risk,
                 features_extracted=True,
                 top_indicators=indicators,
-                raw_scores={"clone_prob": clone_proba, "real_prob": float(proba[0])},
+                raw_scores={
+                    "ml_prob": ml_proba, 
+                    "heuristic_score": heuristic_result.confidence,
+                    "final_prob": final_proba
+                },
             )
-            logger.info("[DETECTOR] %s", result)
+            logger.info("[DETECTOR] %s (ML: %.2f, Heuristic: %.2f)", 
+                        result, ml_proba, heuristic_result.confidence)
             return result
 
         except Exception as exc:
