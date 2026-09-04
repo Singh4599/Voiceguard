@@ -14,6 +14,7 @@ from typing import List
 
 from app.ai.cloning_detector import DetectionResult, get_detector
 import app.dashboard_ws as dashboard_ws
+import app.alerts as alerts
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +94,7 @@ async def analyze_chunk(
         )
 
     # ── Broadcast to dashboard frontend ──────────────────────────────────
+    ts = datetime.now(timezone.utc).isoformat()
     asyncio.ensure_future(dashboard_ws.broadcast_chunk(
         call_id=call_id,
         chunk=chunk_number,
@@ -100,8 +102,42 @@ async def analyze_chunk(
         confidence=float(result.confidence),
         risk=result.risk_level,
         indicators=list(result.top_indicators),
-        timestamp=datetime.now(timezone.utc).isoformat(),
+        timestamp=ts,
     ))
+
+    # ── SMS Prevention Alert ───────────────────────────────────────────
+    should_alert = alerts.record_chunk(
+        call_id, bool(result.is_clone), float(result.confidence)
+    )
+    if should_alert:
+        # We don't have the recipient number here; use call_id as placeholder.
+        # In production, pass the actual phone number from the Exotel call metadata.
+        to_number = _call_phones.get(call_id, "")
+        async def _send(cid: str, num: str) -> None:
+            sent = await alerts.send_sms_alert(num or "0000000000", cid)
+            if sent or not num:
+                await dashboard_ws.broadcast({
+                    "type": "alert_sent",
+                    "call_id": cid,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                })
+        asyncio.ensure_future(_send(call_id, to_number))
 
     return result
 
+
+# Per-call phone number registry (populated by Exotel websocket on call start)
+_call_phones: dict[str, str] = {}
+
+
+def register_call_phone(call_id: str, phone: str) -> None:
+    """Register the caller's phone number so alerts can be sent to them."""
+    _call_phones[call_id] = phone
+
+
+def cleanup_call(call_id: str) -> None:
+    """Clean up all per-call state when a call ends."""
+    _call_history.pop(call_id, None)
+    _call_phones.pop(call_id, None)
+    alerts.reset_call(call_id)
+    asyncio.ensure_future(dashboard_ws.broadcast_call_end(call_id))

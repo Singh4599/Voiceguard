@@ -60,6 +60,17 @@ LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO").upper()
 
 # ---------------------------------------------------------------------------
 # Media-packet log throttle
-# How many packets arrive between progress log lines.
 # ---------------------------------------------------------------------------
 AUDIO_LOG_EVERY_N_PACKETS: int = int(os.getenv("AUDIO_LOG_EVERY_N_PACKETS", "50"))
+
+# ---------------------------------------------------------------------------
+# Exotel SMS Alert (Prevention Layer)
+# ---------------------------------------------------------------------------
+EXOTEL_SID: str      = os.getenv("EXOTEL_SID", "")
+EXOTEL_API_KEY: str  = os.getenv("EXOTEL_API_KEY", "")
+EXOTEL_API_TOKEN: str= os.getenv("EXOTEL_API_TOKEN", "")
+EXOTEL_FROM_NUMBER: str = os.getenv("EXOTEL_FROM_NUMBER", "")  # e.g. 0XXXXXXXXXX
+
+# Trigger SMS alert when AI confidence crosses this threshold for N consecutive chunks
+ALERT_CONFIDENCE_THRESHOLD: float = float(os.getenv("ALERT_CONFIDENCE_THRESHOLD", "0.70"))
+ALERT_CONSECUTIVE_CHUNKS: int = int(os.getenv("ALERT_CONSECUTIVE_CHUNKS", "3"))
