@@ -6,11 +6,14 @@ Called every 2 seconds when a new audio chunk arrives from a live call.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections import defaultdict
+from datetime import datetime, timezone
 from typing import List
 
 from app.ai.cloning_detector import DetectionResult, get_detector
+import app.dashboard_ws as dashboard_ws
 
 logger = logging.getLogger(__name__)
 
@@ -89,8 +92,16 @@ async def analyze_chunk(
             log_prefix, (1 - result.confidence) * 100,
         )
 
-    # ── Phase 3 hook: broadcast to dashboard ─────────────────────────────
-    # TODO: await dashboard_ws.broadcast(call_id, result)
+    # ── Broadcast to dashboard frontend ──────────────────────────────────
+    asyncio.ensure_future(dashboard_ws.broadcast_chunk(
+        call_id=call_id,
+        chunk=chunk_number,
+        is_clone=bool(result.is_clone),
+        confidence=float(result.confidence),
+        risk=result.risk_level,
+        indicators=list(result.top_indicators),
+        timestamp=datetime.now(timezone.utc).isoformat(),
+    ))
 
     return result
 

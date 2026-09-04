@@ -14,10 +14,12 @@ import logging
 import sys
 
 from fastapi import FastAPI, WebSocket
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app import config
 from app.exotel.websocket import handle_exotel_websocket
+from app.dashboard_ws import handle_dashboard_websocket
 
 # ---------------------------------------------------------------------------
 # Logging setup
@@ -44,6 +46,15 @@ app = FastAPI(
         "and saves full call recordings as WAV files."
     ),
     version="1.0.0",
+)
+
+# Allow Next.js dev server to connect
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
@@ -114,3 +125,12 @@ async def exotel_stream(websocket: WebSocket) -> None:
         wss://<your-domain>/ws/exotel
     """
     await handle_exotel_websocket(websocket)
+
+
+@app.websocket("/ws/dashboard")
+async def dashboard_stream(websocket: WebSocket) -> None:
+    """
+    Frontend dashboard WebSocket endpoint.
+    Connect from Next.js: ws://localhost:8000/ws/dashboard
+    """
+    await handle_dashboard_websocket(websocket)
