@@ -137,8 +137,16 @@ def register_call_phone(call_id: str, phone: str) -> None:
 
 
 def cleanup_call(call_id: str) -> None:
-    """Clean up all per-call state when a call ends."""
+    """Clean up all per-call state when a call ends (fires dashboard event async)."""
+    cleanup_call_sync(call_id)
+    try:
+        asyncio.ensure_future(dashboard_ws.broadcast_call_end(call_id))
+    except RuntimeError:
+        pass  # no running loop — websocket already handled it
+
+
+def cleanup_call_sync(call_id: str) -> None:
+    """Clean up AI state only (no async broadcast). Used by exotel websocket."""
     _call_history.pop(call_id, None)
     _call_phones.pop(call_id, None)
     alerts.reset_call(call_id)
-    asyncio.ensure_future(dashboard_ws.broadcast_call_end(call_id))

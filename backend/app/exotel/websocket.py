@@ -33,7 +33,8 @@ from app.exotel.parser import (
     parse_event,
 )
 from app.sessions.manager import CallSession, session_manager
-from app.ai.pipeline import cleanup_call
+from app.ai import pipeline as ai_pipeline
+import app.dashboard_ws as dashboard_ws
 
 logger = logging.getLogger(__name__)
 
@@ -244,5 +245,6 @@ async def _finalise_call(call_id: str) -> None:
             call_id,
         )
 
-    # Tell the dashboard the call ended
-    cleanup_call(call_id)
+    # Tell the dashboard the call ended and clean up AI state
+    ai_pipeline.cleanup_call_sync(call_id)
+    await dashboard_ws.broadcast_call_end(call_id)
