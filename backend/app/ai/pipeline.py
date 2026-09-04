@@ -34,8 +34,9 @@ async def analyze_chunk(
     - Level 1 physics triggers (confidence >= 0.90): BYPASS smoothing → instant alert
     - All other results: exponential weighted average (recent chunks weighted more)
     """
+    # Run heavy ML feature extraction in a thread pool so it doesn't block the WebSocket event loop
     detector = get_detector()
-    result = detector.predict(wav_bytes)
+    result = await asyncio.to_thread(detector.predict, wav_bytes)
 
     log_prefix = f"[AI] call={call_id[:8]}… chunk={chunk_number:03d}"
 
