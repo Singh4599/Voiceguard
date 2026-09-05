@@ -23,8 +23,10 @@ import struct
 import wave
 from pathlib import Path
 
+# pyrefly: ignore [missing-import]
 import librosa
 import numpy as np
+# pyrefly: ignore [missing-import]
 import soundfile as sf
 
 logging.basicConfig(level=logging.INFO,

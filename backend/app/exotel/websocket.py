@@ -35,6 +35,7 @@ from app.exotel.parser import (
 from app.sessions.manager import CallSession, session_manager
 from app.ai import pipeline as ai_pipeline
 import app.dashboard_ws as dashboard_ws
+import app.reports_db as reports_db
 
 logger = logging.getLogger(__name__)
 
@@ -244,6 +245,20 @@ async def _finalise_call(call_id: str) -> None:
             "[CALL STOP] call_id=%s — no audio received, no WAV written",
             call_id,
         )
+
+    # Get AI Summary before cleanup
+    ai_summary = ai_pipeline.get_call_summary(call_id)
+    
+    # Save Report
+    report = {
+        "call_id": call_id,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "duration_seconds": round(session.duration_seconds, 1),
+        "max_confidence": ai_summary["max_confidence"],
+        "risk_level": ai_summary["risk_level"],
+        "recording_url": f"/recordings/{filename}" if pcm else None,
+    }
+    reports_db.save_report(report)
 
     # Tell the dashboard the call ended and clean up AI state
     ai_pipeline.cleanup_call_sync(call_id)

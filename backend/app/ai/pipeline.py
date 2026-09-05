@@ -72,11 +72,11 @@ async def analyze_chunk(
         smoothed = result.confidence
 
     result.confidence = smoothed
-    result.is_clone = smoothed >= 0.5
+    result.is_clone = smoothed >= 0.45
 
-    if smoothed < 0.35:
+    if smoothed < 0.25:
         result.risk_level = "low"
-    elif smoothed < 0.60:
+    elif smoothed < 0.45:
         result.risk_level = "medium"
     else:
         result.risk_level = "high"
@@ -143,6 +143,23 @@ def cleanup_call(call_id: str) -> None:
         asyncio.ensure_future(dashboard_ws.broadcast_call_end(call_id))
     except RuntimeError:
         pass  # no running loop — websocket already handled it
+
+
+def get_call_summary(call_id: str) -> dict:
+    """Retrieve the maximum confidence and corresponding risk level for a call."""
+    history = _call_history.get(call_id, [])
+    if not history:
+        return {"max_confidence": 0.0, "risk_level": "low"}
+    
+    max_conf = max(history)
+    if max_conf < 0.25:
+        risk = "low"
+    elif max_conf < 0.45:
+        risk = "medium"
+    else:
+        risk = "high"
+        
+    return {"max_confidence": float(max_conf), "risk_level": risk}
 
 
 def cleanup_call_sync(call_id: str) -> None:

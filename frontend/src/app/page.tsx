@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { useBackendWS, ChunkEvent } from "@/hooks/useBackendWS";
 import ActiveCallsList from "@/components/ActiveCallsList";
 import CallAnalysis    from "@/components/CallAnalysis";
@@ -27,7 +28,7 @@ export default function DashboardPage() {
   const lastChunks = callList.flatMap((c) => c.chunks.slice(-1));
   useEffect(() => {
     lastChunks.forEach((ev: ChunkEvent) => {
-      if (ev.is_clone && ev.confidence > 0.70) {
+      if (ev.confidence > 0.45) {
         setToasts((prev) => {
           if (prev.some((t) => t.callId === ev.call_id)) return prev;
           const t: Toast = {
@@ -84,7 +85,20 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="topbar-right">
+        <div className="topbar-right" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <Link href="/reports" style={{ 
+            color: 'white', 
+            textDecoration: 'none', 
+            fontSize: '0.85rem', 
+            fontWeight: 600, 
+            background: 'rgba(255,255,255,0.1)', 
+            padding: '0.4rem 0.8rem', 
+            borderRadius: '6px',
+            border: '1px solid rgba(255,255,255,0.2)',
+            transition: 'all 0.2s'
+          }}>
+            📋 View Reports
+          </Link>
           <span className="font-mono" style={{ fontSize: 9, color: "var(--text-3)", letterSpacing: "0.08em" }}>
             SIH 2026 · #26104
           </span>

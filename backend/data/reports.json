@@ -1,0 +1,18 @@
+[
+  {
+    "call_id": "TEST_CALL_1788618861",
+    "timestamp": "2026-09-05T14:34:32.494414+00:00",
+    "duration_seconds": 11.1,
+    "max_confidence": 0.99,
+    "risk_level": "high",
+    "recording_url": "/recordings/call_TEST_CALL_1788618861_20260905_143432.wav"
+  },
+  {
+    "call_id": "40b26600ee853d823ebc01b4d2db1a95",
+    "timestamp": "2026-09-05T14:25:38.229655+00:00",
+    "duration_seconds": 112.6,
+    "max_confidence": 0.4788653643949474,
+    "risk_level": "high",
+    "recording_url": "/recordings/call_40b26600ee853d823ebc01b4d2db1a95_20260905_142538.wav"
+  }
+]

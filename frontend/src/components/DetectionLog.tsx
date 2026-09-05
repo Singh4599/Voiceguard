@@ -20,27 +20,27 @@ export default function DetectionLog({ log, stats }: Props) {
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [log.length]);
 
   const entryClass = (ev: ChunkEvent) => {
-    if (ev.is_clone && ev.confidence > 0.65) return "log-entry log-ai";
-    if (ev.confidence > 0.35)               return "log-entry log-medium";
+    if (ev.confidence > 0.45) return "log-entry log-ai";
+    if (ev.confidence > 0.25) return "log-entry log-medium";
     return "log-entry log-real";
   };
 
   const icon = (ev: ChunkEvent) => {
-    if (ev.is_clone && ev.confidence > 0.65) return "🚨";
-    if (ev.confidence > 0.35)               return "⚠";
+    if (ev.confidence > 0.45) return "🚨";
+    if (ev.confidence > 0.25) return "⚠";
     return "✓";
   };
 
   const label = (ev: ChunkEvent) => {
-    if (ev.is_clone && ev.confidence > 0.65) return "AI Clone";
-    if (ev.confidence > 0.35)               return "Suspicious";
+    if (ev.confidence > 0.45) return "AI Clone";
+    if (ev.confidence > 0.25) return "Suspicious";
     return "Real";
   };
 
   const confColor = (ev: ChunkEvent) =>
-    ev.is_clone && ev.confidence > 0.65
+    ev.confidence > 0.45
       ? "var(--danger)"
-      : ev.confidence > 0.35
+      : ev.confidence > 0.25
       ? "var(--amber)"
       : "var(--teal)";
 
