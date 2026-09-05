@@ -77,20 +77,19 @@ export default function ActiveCallsList({ calls, selectedId, alertedCalls, onSel
         ) : (
           <div className="call-list">
             {sorted.map((c) => (
-              <div key={c.call_id} className={cardClass(c)} onClick={() => onSelect(c.call_id)}>
-                <div className="call-card-top">
-                  <span className="call-number">{maskPhone(c.call_id)}</span>
+              <div key={c.call_id} className={cardClass(c)} onClick={() => onSelect(c.call_id)} style={{ position: 'relative', overflow: 'hidden' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <span className="call-number" style={{ fontSize: '15px', color: 'var(--text-1)' }}>{maskPhone(c.call_id)}</span>
+                    <span className="font-mono" style={{ fontSize: '12px', color: 'var(--text-2)' }}>
+                      {formatDuration(c.started_at)}
+                    </span>
+                  </div>
                   <span className={badgeClass(c)}>{badgeLabel(c)}</span>
                 </div>
-                <div className="call-meta">
-                  <span className="call-duration" style={{ color: c.active ? "var(--teal)" : "var(--text-3)" }}>
-                    {c.active ? "●" : "○"} {formatDuration(c.started_at)}
-                  </span>
-                  <span className="font-mono" style={{ fontSize: 9, color: "var(--text-3)" }}>
-                    {c.chunks.length}ch
-                  </span>
+                <div style={{ marginTop: '16px', margin: '0 -24px -24px -24px' }}>
+                  <MiniWaveform active={c.active} risk={hasClone(c) ? c.latest_risk : "low"} />
                 </div>
-                <MiniWaveform active={c.active} risk={hasClone(c) ? c.latest_risk : "low"} />
                 {alertedCalls.has(c.call_id) && (
                   <div className="prevention-stamp">🛡 PREVENTION ACTIVATED</div>
                 )}

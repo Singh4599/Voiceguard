@@ -60,10 +60,10 @@ export default function CallAnalysis({ call, isAlerted }: Props) {
         )}
 
         {/* Call ID */}
-        <div className="call-id-row">
-          <span className="call-id-label">CALL ID</span>
-          <span className="call-id-value font-mono">
-            {call.call_id.slice(0, 8)}…{call.call_id.slice(-6)}
+        <div className="call-id-row" style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+          <span className="call-id-label" style={{ fontSize: '14px', letterSpacing: '0.1em' }}>CALL ID:</span>
+          <span className="call-id-value font-mono" style={{ fontSize: '16px', color: 'var(--text-2)' }}>
+            {call.call_id}
           </span>
           {isAI && (
             <span className="call-badge badge-high" style={{ marginLeft: "auto" }}>
@@ -83,12 +83,9 @@ export default function CallAnalysis({ call, isAlerted }: Props) {
         {/* Chunk Timeline */}
         <div>
           <div className="section-label">
-            Chunk Timeline
-            <span style={{ fontWeight: 400, fontSize: 8, color: "var(--text-3)", letterSpacing: "0.06em" }}>
-              2s · {call.chunks.length} chunks
-            </span>
+            CHUNK TIMELINE <span style={{ color: "var(--text-3)", textTransform: "none" }}>(2 seconds)</span>
           </div>
-          <div className="chunk-timeline">
+          <div className="chunk-timeline" style={{ marginTop: '12px' }}>
             {call.chunks.map((ev, i) => (
               <div
                 key={i}
@@ -97,18 +94,24 @@ export default function CallAnalysis({ call, isAlerted }: Props) {
               />
             ))}
           </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--text-3)' }}>
+            {[...Array(21)].map((_, i) => <span key={i}>{i}s</span>)}
+          </div>
         </div>
 
         {/* Confidence Bar */}
-        <div className="confidence-bar-wrap">
-          <div className="confidence-labels">
-            <span className="conf-label">AI Probability</span>
-            <span className={confClass}>{confPct}%</span>
+        <div className="confidence-bar-wrap" style={{ marginTop: '24px' }}>
+          <div className="section-label">
+            CONFIDENCE <span style={{ color: "var(--text-3)", textTransform: "none" }}>(2 seconds)</span>
           </div>
+          <div style={{ color: "var(--text-2)", fontSize: '11px', marginBottom: '16px' }}>AI Probability</div>
+          
           <div className="bar-track">
-            <div className={barClass} style={{ width: `${confPct}%` }} />
+            <div className={barClass} style={{ width: `${confPct}%`, position: 'relative' }}>
+              <span style={{ position: 'absolute', right: '-10px', top: '-24px', fontSize: '12px', fontWeight: 600, color: 'inherit' }}>{confPct}%</span>
+              <div style={{ position: 'absolute', right: 0, top: '-4px', bottom: '-4px', width: '2px', background: 'inherit' }}></div>
+            </div>
           </div>
-          <div className="bar-sublabel">{statusLabel}</div>
         </div>
 
         {/* Detection Indicators */}

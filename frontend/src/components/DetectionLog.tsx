@@ -12,7 +12,7 @@ interface Props { log: ChunkEvent[]; stats: Stats; }
 
 function ts(iso: string): string {
   const d = new Date(iso);
-  return `${d.getHours().toString().padStart(2,"0")}:${d.getMinutes().toString().padStart(2,"0")}:${d.getSeconds().toString().padStart(2,"0")}`;
+  return `[${d.getMinutes().toString()}:${d.getSeconds().toString().padStart(2,"0")}.${d.getMilliseconds().toString().padStart(3,"0")}]`;
 }
 
 export default function DetectionLog({ log, stats }: Props) {
@@ -26,15 +26,13 @@ export default function DetectionLog({ log, stats }: Props) {
   };
 
   const icon = (ev: ChunkEvent) => {
-    if (ev.confidence > 0.45) return "🚨";
-    if (ev.confidence > 0.25) return "⚠";
-    return "✓";
+    if (ev.confidence > 0.45) return "😠";
+    if (ev.confidence > 0.25) return "😐";
+    return "🙂";
   };
 
   const label = (ev: ChunkEvent) => {
-    if (ev.confidence > 0.45) return "AI Clone";
-    if (ev.confidence > 0.25) return "Suspicious";
-    return "Real";
+    return "Confidence";
   };
 
   const confColor = (ev: ChunkEvent) =>
@@ -60,44 +58,16 @@ export default function DetectionLog({ log, stats }: Props) {
           </div>
         )}
         {log.map((ev, i) => (
-          <div key={i} className={entryClass(ev)}>
+          <div key={i} className={entryClass(ev)} style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-2)' }}>
             <span className="log-ts">{ts(ev.timestamp)}</span>
-            <span className="log-chunk font-mono">#{ev.chunk.toString().padStart(3,"0")}</span>
-            <span className="log-msg">{icon(ev)} {label(ev)}</span>
-            <span className="log-conf font-mono" style={{ color: confColor(ev) }}>
+            <span className="log-chunk"> chunk {ev.chunk}: </span>
+            <span className="log-msg" style={{ marginLeft: '8px' }}>{icon(ev)} {label(ev)}</span>
+            <span className="log-conf" style={{ color: 'var(--text-1)', marginLeft: '4px' }}>
               {Math.round(ev.confidence * 100)}%
             </span>
           </div>
         ))}
         <div ref={bottomRef} />
-      </div>
-
-      {/* Stats */}
-      <div className="stats-section">
-        <div className="panel-title">Statistics</div>
-        <div className="stats-grid">
-          <div className="stat-card teal-accent">
-            <div className="stat-label">Total Calls</div>
-            <div className="stat-value">{stats.total}</div>
-          </div>
-          <div className={`stat-card ${stats.ai_detected > 0 ? "danger-accent" : "teal-accent"}`}>
-            <div className="stat-label">AI Detected</div>
-            <div className={`stat-value ${stats.ai_detected > 0 ? "danger" : "teal"}`}>
-              {stats.ai_detected}
-            </div>
-          </div>
-          <div className="stat-card teal-accent">
-            <div className="stat-label">False Alerts</div>
-            <div className="stat-value teal">{stats.false_alerts}</div>
-          </div>
-          <div className="stat-card amber-accent">
-            <div className="stat-label">Response</div>
-            <div className="stat-value">
-              {(stats.avg_response_ms / 1000).toFixed(1)}
-              <span style={{ fontSize: 11, color: "var(--text-2)", fontWeight: 400 }}>s</span>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );

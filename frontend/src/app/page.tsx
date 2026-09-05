@@ -5,6 +5,7 @@ import { useBackendWS, ChunkEvent } from "@/hooks/useBackendWS";
 import ActiveCallsList from "@/components/ActiveCallsList";
 import CallAnalysis    from "@/components/CallAnalysis";
 import DetectionLog    from "@/components/DetectionLog";
+import StatisticsPanel from "@/components/StatisticsPanel";
 
 interface Toast {
   id: number;
@@ -66,25 +67,6 @@ export default function DashboardPage() {
       <header className="topbar">
         <span className="topbar-wordmark">VoiceGuard</span>
 
-        <div className="topbar-center">
-          <div className="topbar-stat">
-            <span className="topbar-stat-label">Live Calls</span>
-            <span className={`topbar-stat-value ${liveCount > 0 ? "teal" : ""}`}>
-              {liveCount}
-            </span>
-          </div>
-          <div className="topbar-stat">
-            <span className="topbar-stat-label">AI Detected</span>
-            <span className={`topbar-stat-value ${todayAI > 0 ? "danger" : ""}`}>
-              {todayAI}
-            </span>
-          </div>
-          <div className="topbar-stat">
-            <span className="topbar-stat-label">Total Calls</span>
-            <span className="topbar-stat-value">{stats.total}</span>
-          </div>
-        </div>
-
         <div className="topbar-right" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <Link href="/reports" style={{ 
             color: 'white', 
@@ -121,7 +103,14 @@ export default function DashboardPage() {
           call={selectedCall}
           isAlerted={effectiveId ? alertedCalls.has(effectiveId) : false}
         />
-        <DetectionLog log={globalLog} stats={stats} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', height: '100%', overflow: 'hidden' }}>
+          <div style={{ flex: '6', minHeight: 0 }}>
+            <DetectionLog log={globalLog} stats={stats} />
+          </div>
+          <div style={{ flex: '4', minHeight: 0 }}>
+            <StatisticsPanel stats={stats} />
+          </div>
+        </div>
       </div>
 
       {/* ── Toast Notifications ─────────────────────────────── */}

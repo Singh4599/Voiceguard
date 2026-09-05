@@ -6,13 +6,13 @@
 ══════════════════════════════════════════════════════════════ */
 
 :root {
-  --bg:          #090b0e;
-  --bg-card:     #0f1217;
-  --bg-hover:    #161a22;
-  --bg-input:    #13161e;
+  --bg:          #0f0f11;
+  --bg-card:     #1c1c1f;
+  --bg-hover:    #252528;
+  --bg-input:    #151518;
 
-  --border:      #1c2030;
-  --border-hi:   #252a3a;
+  --border:      #2a2a2e;
+  --border-hi:   #3f3f46;
   --border-glow: #00d4aa33;
 
   --teal:        #00d4aa;
@@ -20,16 +20,16 @@
   --teal-glow:   #00d4aa44;
   --amber:       #f0a500;
   --amber-dim:   #f0a50018;
-  --amber-glow:  #f0a50044;
+  --amber-glow:  #f0a50088; /* stronger glow for amber */
   --danger:      #e8394a;
   --danger-dim:  #e8394a18;
   --danger-glow: #e8394a44;
 
   --text-1:  #dde2ea;
   --text-2:  #6e7a8a;
-  --text-3:  #3d4455;
+  --text-3:  #4a5160;
 
-  --font-sans: 'Space Grotesk', system-ui, sans-serif;
+  --font-sans: 'Inter', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', 'Courier New', monospace;
 
   --radius-sm: 4px;
@@ -234,7 +234,11 @@ html, body {
 .call-card:hover { background: var(--bg-hover); }
 .call-card.active { border-color: var(--border-glow); background: var(--teal-dim); }
 .call-card.active::before { background: var(--teal); }
-.call-card.risk-medium { border-color: var(--amber-glow); background: var(--amber-dim); }
+.call-card.risk-medium { 
+  border-color: var(--amber); 
+  background: var(--amber-dim); 
+  box-shadow: 0 0 16px 2px var(--amber-glow);
+}
 .call-card.risk-medium::before { background: var(--amber); }
 .call-card.risk-high {
   border-color: var(--danger-glow);
@@ -364,8 +368,8 @@ html, body {
   align-items: flex-end;
 }
 .chunk-block {
-  width: 26px;
-  height: 26px;
+  width: 14px;
+  height: 32px;
   border-radius: var(--radius-sm);
   cursor: default;
   position: relative;
@@ -388,10 +392,10 @@ html, body {
 
 /* Confidence bar */
 .confidence-bar-wrap {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: 14px 16px;
+  background: var(--bg);
+  border: none;
+  border-radius: 0;
+  padding: 0;
 }
 .confidence-labels {
   display: flex;
@@ -406,26 +410,17 @@ html, body {
 .conf-high   { color: var(--danger); }
 
 .bar-track {
-  height: 5px;
-  border-radius: 3px;
+  height: 4px;
+  border-radius: 2px;
   background: var(--border);
   overflow: visible;
   position: relative;
 }
 .bar-fill {
   height: 100%;
-  border-radius: 3px;
+  border-radius: 2px;
   transition: width 0.6s cubic-bezier(0.4,0,0.2,1), background 0.4s;
   position: relative;
-}
-.bar-fill::after {
-  content: '';
-  position: absolute;
-  right: -1px; top: -2px;
-  width: 2px; height: 9px;
-  border-radius: 1px;
-  background: inherit;
-  filter: brightness(1.5);
 }
 .bar-fill.real   { background: var(--teal);  box-shadow: 0 0 8px var(--teal-glow); }
 .bar-fill.medium { background: var(--amber); box-shadow: 0 0 8px var(--amber-glow); }
