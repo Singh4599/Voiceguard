@@ -18,27 +18,47 @@ logger = logging.getLogger(__name__)
 # Global set of connected dashboard clients
 _clients: Set[WebSocket] = set()
 
+# Heartbeat interval — send server ping every 20s to keep Railway/proxies alive
+_HEARTBEAT_INTERVAL = 20
+
 
 async def handle_dashboard_websocket(websocket: WebSocket) -> None:
-    """Accept and maintain a frontend dashboard connection."""
+    """Accept and maintain a frontend dashboard connection with keepalive."""
     await websocket.accept()
+    global _clients
     _clients.add(websocket)
     logger.info("[DASHBOARD] Client connected. Total: %d", len(_clients))
+
+    # Send heartbeat pings independently of incoming messages
+    async def _heartbeat() -> None:
+        while True:
+            await asyncio.sleep(_HEARTBEAT_INTERVAL)
+            try:
+                await websocket.send_text(json.dumps({"type": "keepalive"}))
+            except Exception:
+                break  # connection gone — the receiver task will clean up
+
+    heartbeat_task = asyncio.create_task(_heartbeat())
+
     try:
-        # Keep alive — frontend sends pings, we echo pong
+        # Drain incoming frames (frontend may send "ping") — also detects disconnects
         while True:
             try:
-                data = await asyncio.wait_for(websocket.receive_text(), timeout=30)
+                data = await asyncio.wait_for(websocket.receive_text(), timeout=60)
                 if data == "ping":
                     await websocket.send_text("pong")
             except asyncio.TimeoutError:
-                # Send keepalive
-                await websocket.send_text(json.dumps({"type": "keepalive"}))
+                # 60s without any message from client is unusual — send one more ping
+                try:
+                    await websocket.send_text(json.dumps({"type": "keepalive"}))
+                except Exception:
+                    break
     except WebSocketDisconnect:
         pass
     except Exception as exc:
         logger.warning("[DASHBOARD] Client error: %s", exc)
     finally:
+        heartbeat_task.cancel()
         _clients.discard(websocket)
         logger.info("[DASHBOARD] Client disconnected. Total: %d", len(_clients))
 

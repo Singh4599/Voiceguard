@@ -51,9 +51,15 @@ export function useBackendWS() {
 
     ws.onopen = () => {
       setState((s) => ({ ...s, connected: true }));
+      // Send ping every 15s to keep Railway/proxy alive
+      const pingInterval = setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) ws.send("ping");
+      }, 15000);
+      (ws as any)._pingInterval = pingInterval;
     };
 
     ws.onclose = () => {
+      clearInterval((ws as any)._pingInterval);
       setState((s) => ({ ...s, connected: false }));
       reconnectTimer.current = setTimeout(connect, 2500);
     };
