@@ -1,5 +1,4 @@
 "use client";
-import { useState } from "react";
 import { CallInfo, ChunkEvent } from "@/hooks/useBackendWS";
 import Oscilloscope from "./Oscilloscope";
 
@@ -18,40 +17,15 @@ function chunkClass(ev: ChunkEvent, isLatest: boolean): string {
 }
 
 export default function CallAnalysis({ call, isAlerted }: Props) {
-  const [simulating, setSimulating] = useState(false);
-
-  const handleSimulate = async () => {
-    setSimulating(true);
-    try {
-      await fetch("http://localhost:8000/api/simulate", { method: "POST" });
-      setTimeout(() => setSimulating(false), 2000);
-    } catch (e) {
-      console.error(e);
-      setSimulating(false);
-    }
-  };
-
   if (!call) {
     return (
       <div className="panel" style={{ borderRight: "1px solid var(--border)" }}>
         <div className="panel-header">
           <span className="panel-title">Call Analysis</span>
         </div>
-        <div className="radar-container">
-          <div className="radar">
-            <div className="radar-sweep"></div>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
-            <span className="empty-title">Scanning Frequencies</span>
-            <span className="empty-subtitle">Waiting to intercept and analyze live Exotel audio streams.</span>
-          </div>
-          <button 
-            className="simulate-btn" 
-            onClick={handleSimulate} 
-            disabled={simulating}
-          >
-            {simulating ? "INJECTING SIGNAL..." : "SIMULATE DEMO CALL"}
-          </button>
+        <div className="no-call">
+          <span className="no-call-icon">🎙️</span>
+          <span className="no-call-text">Select a call to analyse</span>
         </div>
       </div>
     );

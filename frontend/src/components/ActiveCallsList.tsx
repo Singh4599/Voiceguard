@@ -70,14 +70,9 @@ export default function ActiveCallsList({ calls, selectedId, alertedCalls, onSel
 
       <div className="panel-body">
         {sorted.length === 0 ? (
-          <div className="radar-container" style={{ transform: 'scale(0.8)', padding: '4rem 1rem' }}>
-            <div className="radar">
-              <div className="radar-sweep"></div>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
-              <span className="empty-title" style={{ fontSize: '11px' }}>Listening...</span>
-              <span className="empty-subtitle" style={{ fontSize: '10px' }}>Zero active traces found.</span>
-            </div>
+          <div className="no-call" style={{ marginTop: 60 }}>
+            <span className="no-call-icon">📞</span>
+            <span className="no-call-text">Waiting for calls…</span>
           </div>
         ) : (
           <div className="call-list">

@@ -13,12 +13,10 @@ from __future__ import annotations
 import logging
 import sys
 
-from fastapi import FastAPI, WebSocket, BackgroundTasks
+from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-import subprocess
-import os
 
 from app import config
 from app.exotel.websocket import handle_exotel_websocket
@@ -124,19 +122,6 @@ async def get_reports() -> JSONResponse:
     """Return all saved call reports."""
     reports = reports_db.get_all_reports()
     return JSONResponse(content={"reports": reports}, status_code=200)
-
-@app.post("/api/simulate", tags=["Test"])
-async def simulate_call(background_tasks: BackgroundTasks) -> JSONResponse:
-    """Run the Exotel simulator script in the background."""
-    def run_sim():
-        script_path = os.path.join(os.path.dirname(__file__), "..", "simulate_exotel.py")
-        python_bin = os.path.join(os.path.dirname(__file__), "..", "venv", "bin", "python")
-        if not os.path.exists(python_bin):
-            python_bin = "python"
-        subprocess.Popen([python_bin, script_path])
-        
-    background_tasks.add_task(run_sim)
-    return JSONResponse(content={"status": "simulation_started"}, status_code=200)
 
 # ---------------------------------------------------------------------------
 # WebSocket endpoint
