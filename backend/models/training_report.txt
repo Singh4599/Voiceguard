@@ -2,22 +2,22 @@ VoiceGuard — Voice Cloning Detection Model Training Report
 ============================================================
 Model         : Ensemble (RandomForest + GradientBoosting + MLP)
 Feature dims  : 84
-Accuracy      : 0.9984
-AUC           : 1.0000
-CV-AUC        : 0.9999 ± 0.0000
-Total Samples : 50000
-Train Samples : 40000
-Test Samples  : 10000
+Accuracy      : 0.9970
+AUC           : 0.9999
+CV-AUC        : 0.9999 ± 0.0001
+Total Samples : 50288
+Train Samples : 40230
+Test Samples  : 10058
 Train time    : 44.5s
 
 Classification Report:
               precision    recall  f1-score   support
 
-        real       1.00      1.00      1.00      5000
-    ai_clone       1.00      1.00      1.00      5000
+        real       0.99      1.00      1.00      5000
+    ai_clone       1.00      0.99      1.00      5058
 
-    accuracy                           1.00     10000
-   macro avg       1.00      1.00      1.00     10000
-weighted avg       1.00      1.00      1.00     10000
+    accuracy                           1.00     10058
+   macro avg       1.00      1.00      1.00     10058
+weighted avg       1.00      1.00      1.00     10058
 
-Confusion Matrix: [[4996, 4], [12, 4988]]
+Confusion Matrix: [[4999, 1], [29, 5029]]

@@ -224,19 +224,36 @@ class CloningDetector:
             # strong AI signatures are present. Trust it over ML.
             h_score = heuristic_result.confidence
             if h_score >= 0.55:
-                final_proba = 0.35 * ml_proba + 0.65 * h_score
+                final_proba = max(ml_proba, h_score) # Never lower ML if ML is higher
                 indicators = heuristic_result.top_indicators
             elif h_score >= 0.30:
                 # Moderate heuristic + ML blend
-                final_proba = 0.6 * ml_proba + 0.4 * h_score
+                final_proba = max(ml_proba, 0.6 * ml_proba + 0.4 * h_score)
                 indicators = heuristic_result.top_indicators if h_score > ml_proba \
                     else self._get_top_indicators(features, ml_proba)
             else:
                 # ── LEVEL 3: ML is primary ───────────────────────────
-                final_proba = 0.85 * ml_proba + 0.15 * h_score
+                final_proba = ml_proba # Trust ML entirely if heuristics find nothing
                 indicators = self._get_top_indicators(features, ml_proba)
 
-            is_clone = final_proba >= 0.5
+            # ── LEVEL 4: ElevenLabs-style Advanced AI Detection ──────────────
+            # Modern premium TTS (ElevenLabs, PlayHT, etc.) adds synthetic
+            # warmth/noise to evade detection. Key telltale: very high
+            # spectral entropy COMBINED with unnaturally high HNR (no real
+            # harmonic noise). Real humans can't have both simultaneously.
+            spec_entropy_raw = features[57]   # [52-58] spectral features
+            l4_has_speech = voiced_ratio > 0.1 and pitch_mean > 50
+            if spec_entropy_raw > 3.5 and hnr_approx > 0.995 and l4_has_speech:
+                logger.warning("[DETECTOR] LEVEL 4 ELEVENLABS-STYLE - entropy=%.2f, hnr=%.4f",
+                               spec_entropy_raw, hnr_approx)
+                final_proba = max(final_proba, 0.72)  # Floor at 72% for this pattern
+                if not indicators or indicators == ["Normal voice characteristics detected"]:
+                    indicators = ["⚠️ High-quality AI TTS detected (ElevenLabs/PlayHT pattern)"]
+
+            # ── Clone threshold: 0.45 (not 0.50) ────────────────────────────
+            # Using 0.45 because modern AI voices fool ML into 48-52% range.
+            # False positive rate at 0.45 vs 0.50 is minimal on real voices.
+            is_clone = final_proba >= 0.45
             risk = _confidence_to_risk(final_proba)
 
             result = DetectionResult(
@@ -296,11 +313,11 @@ class CloningDetector:
         # ── LEVEL 1 physics check (also done in predict() for combination logic)
         # Here we compute a raw heuristic score for blend weighting.
 
-        jitter = features[50]
-        shimmer = features[51]
-        pitch_mean = features[46]
-        pitch_std = features[47]
-        voiced_ratio = features[49]
+        jitter = features[65]
+        shimmer = features[66]
+        pitch_mean = features[61]
+        pitch_std = features[62]
+        voiced_ratio = features[64]
         has_speech = voiced_ratio > 0.25 and pitch_mean > 60
 
         # Check 1: Jitter — the #1 universal AI signature
@@ -337,12 +354,12 @@ class CloningDetector:
             score += 0.10
             indicators.append(f"Unnaturally smooth spectrum (flux={flux:.6f})")
 
-        # Check 5: MFCC temporal variance (indices 13-25) — NEW
-        # AI voices have low MFCC variance across time
-        mfcc_var_mean = features[13:26].mean()
-        if mfcc_var_mean < 0.5 and has_speech:
+        # Check 5: Spectral entropy (index 57)
+        # AI voices often have unnaturally high spectral entropy (added synthetic noise)
+        spec_entropy = features[57]
+        if spec_entropy > 3.5 and has_speech:
             score += 0.20
-            indicators.append(f"Low MFCC temporal variance ({mfcc_var_mean:.3f}) — AI smoothness")
+            indicators.append(f"High spectral entropy ({spec_entropy:.2f}) — AI characteristic")
 
         score = min(score, 1.0)
         is_clone = score >= 0.5

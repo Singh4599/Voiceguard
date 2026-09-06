@@ -13,7 +13,7 @@ from __future__ import annotations
 import logging
 import sys
 
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI, UploadFile, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -122,6 +122,56 @@ async def get_reports() -> JSONResponse:
     """Return all saved call reports."""
     reports = reports_db.get_all_reports()
     return JSONResponse(content={"reports": reports}, status_code=200)
+
+
+@app.post("/api/analyze", tags=["Analysis"])
+async def analyze_audio(file: UploadFile) -> JSONResponse:
+    """
+    Upload an audio file (WAV/MP3) and run voice clone detection on it.
+    Returns: is_clone, confidence, risk_level, indicators.
+    """
+    import io
+    import numpy as np
+    import librosa
+    import soundfile as sf
+
+    try:
+        contents = await file.read()
+        filename = (file.filename or "upload").lower()
+
+        if filename.endswith(".wav"):
+            wav_bytes = contents
+        else:
+            # Decode MP3/OGG/M4A via librosa
+            audio_buf = io.BytesIO(contents)
+            y, sr = librosa.load(audio_buf, sr=16000, mono=True)
+            out_buf = io.BytesIO()
+            sf.write(out_buf, y.astype(np.float32), sr, format="WAV", subtype="PCM_16")
+            wav_bytes = out_buf.getvalue()
+
+        from app.ai.cloning_detector import get_detector
+        detector = get_detector()
+
+        if not detector.is_ready():
+            return JSONResponse(
+                content={"error": "Model not loaded. Run training/train.py first."},
+                status_code=503,
+            )
+
+        result = detector.predict(wav_bytes)
+
+        return JSONResponse(content={
+            "is_clone": result.is_clone,
+            "confidence": round(result.confidence * 100, 1),
+            "risk_level": result.risk_level,
+            "indicators": result.top_indicators,
+            "raw_scores": result.raw_scores,
+            "label": "AI Voice Detected" if result.is_clone else "Real Human Voice",
+        }, status_code=200)
+
+    except Exception as exc:
+        logger.error("[ANALYZE] Error: %s", exc)
+        return JSONResponse(content={"error": str(exc)}, status_code=500)
 
 # ---------------------------------------------------------------------------
 # WebSocket endpoint

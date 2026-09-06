@@ -6,6 +6,7 @@ import ActiveCallsList from "@/components/ActiveCallsList";
 import CallAnalysis    from "@/components/CallAnalysis";
 import DetectionLog    from "@/components/DetectionLog";
 import StatisticsPanel from "@/components/StatisticsPanel";
+import VoiceAnalyzer   from "@/components/VoiceAnalyzer";
 import {
   VoiceOrb,
   type VoiceOrbState,
@@ -25,6 +26,7 @@ export default function DashboardPage() {
   const [toasts, setToasts]         = useState<Toast[]>([]);
   const [alertedCalls, setAlertedCalls] = useState<Set<string>>(new Set());
   const [view, setView] = useState<ViewState>("orb");
+  const [showAnalyzer, setShowAnalyzer] = useState(false);
   const prevCallCount = useRef(0);
 
   // Auto-select latest active call
@@ -253,6 +255,33 @@ export default function DashboardPage() {
             ))}
           </div>
 
+          {/* ── Analyze Voice Button ── */}
+          <button
+            onClick={() => setShowAnalyzer(true)}
+            style={{
+              position: 'absolute', bottom: '170px',
+              display: 'flex', alignItems: 'center', gap: '8px',
+              padding: '10px 20px',
+              background: 'rgba(16,185,129,0.08)',
+              border: '1px solid rgba(16,185,129,0.25)',
+              borderRadius: '50px',
+              color: 'rgba(16,185,129,0.9)',
+              fontSize: '12px', letterSpacing: '0.1em',
+              fontFamily: 'var(--font-mono)',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+            }}
+            onMouseOver={e => { e.currentTarget.style.background = 'rgba(16,185,129,0.15)'; e.currentTarget.style.borderColor = 'rgba(16,185,129,0.5)'; }}
+            onMouseOut={e => { e.currentTarget.style.background = 'rgba(16,185,129,0.08)'; e.currentTarget.style.borderColor = 'rgba(16,185,129,0.25)'; }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+              <line x1="12" y1="19" x2="12" y2="22"/>
+            </svg>
+            ANALYZE VOICE FILE
+          </button>
+
           <div className="orb-status-bar">
             <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span className={`orb-status-dot ${connected ? 'active' : 'inactive'}`} />
@@ -283,12 +312,36 @@ export default function DashboardPage() {
             isAlerted={effectiveId ? alertedCalls.has(effectiveId) : false}
           />
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', height: '100%', overflow: 'hidden' }}>
-            <div style={{ flex: '6', minHeight: 0 }}>
+            <div style={{ flex: '4', minHeight: 0 }}>
               <DetectionLog log={globalLog} stats={stats} />
             </div>
-            <div style={{ flex: '4', minHeight: 0 }}>
+            <div style={{ flex: '3', minHeight: 0 }}>
               <StatisticsPanel stats={stats} />
             </div>
+            <div style={{ flex: '3', minHeight: 0, overflow: 'auto' }}>
+              <VoiceAnalyzer />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Voice Analyzer Modal ─────────────────────── */}
+      {showAnalyzer && (
+        <div
+          onClick={() => setShowAnalyzer(false)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 1000,
+            background: 'rgba(0,0,0,0.8)',
+            backdropFilter: 'blur(10px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <div onClick={(e) => e.stopPropagation()} style={{ width: '480px', maxWidth: '90vw' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', padding: '0 2px' }}>
+              <span style={{ color: 'rgba(255,255,255,0.45)', fontSize: '11px', letterSpacing: '0.15em', fontFamily: 'var(--font-mono)', textTransform: 'uppercase' }}>Voice Detection Lab</span>
+              <button onClick={() => setShowAnalyzer(false)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '20px', lineHeight: 1 }}>✕</button>
+            </div>
+            <VoiceAnalyzer />
           </div>
         </div>
       )}

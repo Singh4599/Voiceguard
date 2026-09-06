@@ -97,6 +97,9 @@ def main() -> None:
 def _clean_synthetic(directory: Path, prefix: str) -> None:
     removed = 0
     for f in directory.glob(f"{prefix}*.wav"):
+        # NEVER delete real ElevenLabs samples — they are critical training data
+        if f.name.startswith("elevenlabs_real_"):
+            continue
         f.unlink()
         removed += 1
     if removed:
@@ -137,11 +140,8 @@ def _copy_telecom_ai_chunks() -> None:
         if not dest.exists():
             shutil.copy2(wav_file, dest)
             copied += 1
-    # Also copy ElevenLabs aug files that were already generated
-    for f in FAKE_DIR.glob("elevenlabs_aug_*.wav"):
-        pass  # already there, keep
-    for f in FAKE_DIR.glob("telecom_ai_call_db*.wav"):
-        pass  # already there, keep
+    # Keep ElevenLabs real samples (elevenlabs_real_*) — do NOT delete them
+    # These are real ElevenLabs WAV files chunked+augmented for better generalization.
     if copied:
         logger.info("Copied %d telecom-AI chunks to fake", copied)
 
