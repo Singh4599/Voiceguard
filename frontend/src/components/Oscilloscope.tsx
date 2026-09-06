@@ -25,17 +25,6 @@ export default function Oscilloscope({ chunks, active }: Props) {
     resize();
     window.addEventListener("resize", resize);
 
-    // Pick color based on latest chunk
-    const latestConf = chunks.length > 0 ? chunks[chunks.length - 1].confidence : 0;
-    const isClone = chunks.length > 0 && chunks[chunks.length - 1].is_clone;
-
-    const getColor = () => {
-      if (!active) return "#4a5260";
-      if (isClone && latestConf > 0.7) return "#e8394a";
-      if (latestConf > 0.4) return "#f0a500";
-      return "#00d4aa";
-    };
-
     let phase = phaseRef.current;
 
     const draw = () => {
@@ -59,10 +48,23 @@ export default function Oscilloscope({ chunks, active }: Props) {
         ctx.stroke();
       }
 
-      const color = getColor();
-      const amplitude = active ? (isClone ? 0.38 : 0.22) : 0.06;
+      // Build a waveform that reflects actual confidence data from chunks
+      // Each chunk's confidence drives the amplitude in its segment
+      const numChunks = Math.max(chunks.length, 1);
+      const latestConf = chunks.length > 0 ? chunks[chunks.length - 1].confidence : 0;
+      const isClone = chunks.length > 0 && chunks[chunks.length - 1].is_clone;
 
-      // Glow effect
+      // Color based on real latest confidence
+      let color = "#00d4aa"; // green = real
+      if (!active) {
+        color = "#4a5260";
+      } else if (isClone && latestConf > 0.7) {
+        color = "#e8394a"; // red = AI clone
+      } else if (latestConf > 0.4) {
+        color = "#f0a500"; // amber = suspicious
+      }
+
+      // Glow
       if (active) {
         ctx.shadowColor = color;
         ctx.shadowBlur = isClone ? 8 : 4;
@@ -72,18 +74,28 @@ export default function Oscilloscope({ chunks, active }: Props) {
       ctx.strokeStyle = color;
       ctx.lineWidth = 1.5;
 
-      const points = 300;
+      const points = 400;
       for (let i = 0; i <= points; i++) {
         const x = (i / points) * W;
         const t = (i / points) * Math.PI * 6 + phase;
 
-        // Composite waveform — more complex = more "real" looking
+        // Map x-position to the corresponding chunk index
+        const chunkIdx = Math.min(Math.floor((i / points) * numChunks), numChunks - 1);
+        const chunkConf = chunks[chunkIdx]?.confidence ?? 0;
+
+        // Amplitude driven by the chunk's confidence value
+        // Higher confidence = higher amplitude (more agitated signal)
+        const baseAmp = active ? 0.12 : 0.04;
+        const confAmp = chunkConf * 0.3; // confidence scales 0..0.3
+        const amplitude = baseAmp + confAmp;
+
+        // Composite waveform using chunk data as seed
         const y =
           H / 2 +
           Math.sin(t) * amplitude * H +
-          Math.sin(t * 2.3 + 0.5) * amplitude * 0.4 * H +
-          Math.sin(t * 5.1 + 1.2) * amplitude * 0.15 * H +
-          (active ? (Math.random() - 0.5) * amplitude * 0.3 * H : 0);
+          Math.sin(t * 2.3 + chunkConf * 5) * amplitude * 0.35 * H +
+          Math.sin(t * 4.7 + chunkConf * 10) * amplitude * 0.15 * H +
+          (active ? (Math.random() - 0.5) * amplitude * 0.2 * H : 0);
 
         if (i === 0) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
@@ -91,7 +103,7 @@ export default function Oscilloscope({ chunks, active }: Props) {
       ctx.stroke();
       ctx.shadowBlur = 0;
 
-      phase += active ? (isClone ? 0.06 : 0.03) : 0.005;
+      phase += active ? (isClone ? 0.05 : 0.025) : 0.003;
       phaseRef.current = phase;
       frameRef.current = requestAnimationFrame(draw);
     };

@@ -87,7 +87,7 @@ export default function ActiveCallsList({ calls, selectedId, alertedCalls, onSel
                   </div>
                   <span className={badgeClass(c)}>{badgeLabel(c)}</span>
                 </div>
-                <div style={{ marginTop: '16px', margin: '0 -24px -24px -24px' }}>
+                <div style={{ marginTop: '10px', margin: '10px -14px -10px -14px' }}>
                   <MiniWaveform active={c.active} risk={hasClone(c) ? c.latest_risk : "low"} />
                 </div>
                 {alertedCalls.has(c.call_id) && (
