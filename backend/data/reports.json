@@ -1,5 +1,77 @@
 [
   {
+    "call_id": "ca7d1d1ff556bc3cc2b30fabdebb1a96",
+    "timestamp": "2026-09-06T08:49:19.817756+00:00",
+    "duration_seconds": 33.1,
+    "max_confidence": 0.3240388888888888,
+    "risk_level": "medium",
+    "recording_url": "/recordings/call_ca7d1d1ff556bc3cc2b30fabdebb1a96_20260906_084919.wav"
+  },
+  {
+    "call_id": "09e0ce2545471c53fdb693cf4c201a96",
+    "timestamp": "2026-09-06T08:48:07.657312+00:00",
+    "duration_seconds": 8.8,
+    "max_confidence": 0.4933769551216129,
+    "risk_level": "high",
+    "recording_url": "/recordings/call_09e0ce2545471c53fdb693cf4c201a96_20260906_084807.wav"
+  },
+  {
+    "call_id": "8ee217b785178be2a69e4094b0d71a96",
+    "timestamp": "2026-09-06T08:47:39.448057+00:00",
+    "duration_seconds": 34.3,
+    "max_confidence": 0.5100931062305674,
+    "risk_level": "high",
+    "recording_url": "/recordings/call_8ee217b785178be2a69e4094b0d71a96_20260906_084739.wav"
+  },
+  {
+    "call_id": "8cb798822de80bfb21271f1605261a96",
+    "timestamp": "2026-09-06T08:46:04.039649+00:00",
+    "duration_seconds": 21.6,
+    "max_confidence": 0.4845931062305675,
+    "risk_level": "high",
+    "recording_url": "/recordings/call_8cb798822de80bfb21271f1605261a96_20260906_084604.wav"
+  },
+  {
+    "call_id": "9c95c438104e30627cd89337a4591a96",
+    "timestamp": "2026-09-06T08:42:45.709523+00:00",
+    "duration_seconds": 25.0,
+    "max_confidence": 0.16384392888673233,
+    "risk_level": "low",
+    "recording_url": "/recordings/call_9c95c438104e30627cd89337a4591a96_20260906_084245.wav"
+  },
+  {
+    "call_id": "22e388c038d3efa56827386a6b141a96",
+    "timestamp": "2026-09-06T08:35:52.603822+00:00",
+    "duration_seconds": 8.5,
+    "max_confidence": 0.3915488121446703,
+    "risk_level": "medium",
+    "recording_url": "/recordings/call_22e388c038d3efa56827386a6b141a96_20260906_083552.wav"
+  },
+  {
+    "call_id": "e137c3c32959312904cef16ac6dd1a96",
+    "timestamp": "2026-09-06T08:16:38.053855+00:00",
+    "duration_seconds": 7.0,
+    "max_confidence": 0.5763755134867607,
+    "risk_level": "high",
+    "recording_url": "/recordings/call_e137c3c32959312904cef16ac6dd1a96_20260906_081638.wav"
+  },
+  {
+    "call_id": "eb16123c2e9aaacbe07d08eb81a01a96",
+    "timestamp": "2026-09-06T08:16:10.487395+00:00",
+    "duration_seconds": 5.3,
+    "max_confidence": 0.38958299925323275,
+    "risk_level": "medium",
+    "recording_url": "/recordings/call_eb16123c2e9aaacbe07d08eb81a01a96_20260906_081610.wav"
+  },
+  {
+    "call_id": "869f2228c6891ad511b92eadb1331a96",
+    "timestamp": "2026-09-06T07:23:16.494273+00:00",
+    "duration_seconds": 9.1,
+    "max_confidence": 0.4675944444444444,
+    "risk_level": "high",
+    "recording_url": "/recordings/call_869f2228c6891ad511b92eadb1331a96_20260906_072316.wav"
+  },
+  {
     "call_id": "c8d2f2a2870b5a4f5168c2c731481a96",
     "timestamp": "2026-09-06T07:14:54.715071+00:00",
     "duration_seconds": 73.8,
