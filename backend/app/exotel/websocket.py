@@ -129,12 +129,9 @@ def _handle_connected(event: ExotelConnectedEvent) -> None:
 def _handle_start(event: ExotelStartEvent) -> None:
     mf = event.media_format
 
-    # Determine sample width from encoding
-    # μ-law raw bytes are 8-bit, but we convert to 16-bit PCM in the decoder.
-    # Linear-16 is always 16-bit.  Default to 16-bit for WAV compatibility.
     sample_width = 2  # 2 bytes = 16-bit PCM (post-decoding)
 
-    session_manager.create_session(
+    session = session_manager.create_session(
         call_id=event.call_id or f"unknown_{datetime.now(tz=timezone.utc).timestamp():.0f}",
         stream_id=event.stream_id,
         account_id=event.account_id,
@@ -144,6 +141,10 @@ def _handle_start(event: ExotelStartEvent) -> None:
         sample_width=sample_width,
         raw_media_format=mf.raw,
     )
+
+    # Wire the AI pipeline callback HERE, in the layer that knows about both
+    # audio and AI. AudioBuffer stays ignorant of the AI module entirely.
+    session.audio_buffer._on_chunk_ready = ai_pipeline.analyze_chunk
 
     logger.info(
         "[CALL START]\n"
