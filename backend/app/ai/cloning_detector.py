@@ -3,10 +3,18 @@ app/ai/cloning_detector.py — Custom voice cloning detection model.
 
 Architecture
 ------------
-1.  Feature vector (62 dims) from feature_extractor.py
+1.  Feature vector (84 dims) from feature_extractor.py
+    [0-12]  MFCC means
+    [13-25] MFCC temporal variance (AI KEY: very low variance)
+    [26-38] MFCC delta
+    [39-51] MFCC delta2
+    [52-58] Spectral (centroid, rolloff, BW, flux, contrast, entropy, flatness)
+    [59-60] ZCR, RMS
+    [61-68] Pitch (F0 mean/std/range, voiced_ratio, jitter, shimmer, HNR, F0_velocity)
+    [69-78] Chroma
+    [79-83] Voice quality (RMS_var, ZCR_var, rolloff_var, energy_entropy, MFCC1_var)
 2.  StandardScaler normalization
-3.  RandomForestClassifier (primary, fast, interpretable)
-    OR a small MLPClassifier (neural network, higher accuracy)
+3.  VotingClassifier ensemble (RandomForest + GradientBoosting + MLP)
 
 The model is trained by training/train.py and saved to:
     backend/models/voice_clone_detector.pkl
@@ -159,33 +167,56 @@ class CloningDetector:
             #   For advanced AI voices that partially mimic humans.
             # ════════════════════════════════════════════════════════
 
-            jitter = features[50]
-            shimmer = features[51]
-            pitch_mean = features[46]
-            pitch_std = features[47]
-            voiced_ratio = features[49]
+            # New feature layout (84 dims):
+            # [0-12]  MFCC means
+            # [13-25] MFCC temporal variance
+            # [26-38] MFCC delta
+            # [39-51] MFCC delta2
+            # [52-58] spectral (centroid, rolloff, bw, flux, contrast, entropy, flatness)
+            # [59-60] ZCR, RMS
+            # [61-68] pitch (f0_mean, f0_std, f0_range, voiced_ratio, jitter, shimmer, hnr, f0_vel)
+            # [69-78] chroma
+            # [79-83] voice quality (rms_var, zcr_var, rolloff_var, energy_entropy, mfcc1_var)
 
-            # ── LEVEL 1: Physics Inviolable (zero jitter = old/simple TTS) ──
+            jitter       = features[65]   # was [50]
+            shimmer      = features[66]   # was [51]
+            pitch_mean   = features[61]   # was [46]
+            pitch_std    = features[62]   # was [47]
+            voiced_ratio = features[64]   # was [49]
+            hnr_approx   = features[67]   # NEW
+            f0_velocity  = features[68]   # NEW
+            mfcc_var_mean = features[13:26].mean()   # NEW: MFCC temporal variance
+
+            # ── LEVEL 1: Physics Inviolable ──────────────────────────────
             # No human larynx can produce perfectly periodic vocal folds.
-            # Catches: basic TTS, Google TTS, older Bark, XTTS
             level1_triggered = (
                 jitter < 0.0005              # essentially zero jitter
-                and voiced_ratio > 0.3       # there IS actual speech (not silence)
-                and pitch_mean > 60          # there IS a pitch (not noise)
+                and voiced_ratio > 0.3       # there IS actual speech
+                and pitch_mean > 60          # there IS a pitch
             )
             if level1_triggered:
                 logger.warning(
-                    "[DETECTOR] ⚡ LEVEL 1 PHYSICS — Zero jitter=%.5f", jitter
+                    "[DETECTOR] LEVEL 1 PHYSICS - Zero jitter=%.5f", jitter
                 )
                 return DetectionResult(
                     is_clone=True, confidence=0.99, risk_level="high",
                     features_extracted=True,
                     top_indicators=[
-                        f"⚡ ZERO JITTER ({jitter:.5f}) — synthesized voice signature",
+                        f"ZERO JITTER ({jitter:.5f}) - synthesized voice signature",
                         f"Voiced speech confirmed (ratio={voiced_ratio:.2f}, F0={pitch_mean:.0f}Hz)",
                     ],
                     raw_scores={"ml_prob": ml_proba, "level": 1},
                 )
+
+            # ── LEVEL 2: MFCC Variance check (NEW) ───────────────────────
+            # AI voices have extremely consistent MFCCs across time.
+            # Human voices have natural temporal variance in all MFCC bands.
+            if mfcc_var_mean < 0.5 and voiced_ratio > 0.3:
+                logger.warning(
+                    "[DETECTOR] LEVEL 2 LOW-MFCC-VAR - mean_var=%.4f", mfcc_var_mean
+                )
+                # Boost ML score significantly
+                ml_proba = min(1.0, ml_proba * 1.4 + 0.15)
 
 
             # ── LEVEL 2: Strong Heuristics ───────────────────────────
@@ -218,6 +249,9 @@ class CloningDetector:
                     "ml_prob": ml_proba,
                     "heuristic_score": h_score,
                     "final_prob": final_proba,
+                    "mfcc_var": float(mfcc_var_mean),
+                    "jitter": float(jitter),
+                    "hnr": float(hnr_approx),
                     "level": 2 if h_score >= 0.30 else 3,
                 },
             )
@@ -297,11 +331,18 @@ class CloningDetector:
             score += 0.15
             indicators.append(f"Monotone pitch (std={pitch_std:.1f} Hz) — AI prosody")
 
-        # Check 4: Spectral flux — AI spectra are too smooth
-        flux = features[42]
+        # Check 4: Spectral flux (now at index 55)
+        flux = features[55]
         if flux < 0.0005:
             score += 0.10
             indicators.append(f"Unnaturally smooth spectrum (flux={flux:.6f})")
+
+        # Check 5: MFCC temporal variance (indices 13-25) — NEW
+        # AI voices have low MFCC variance across time
+        mfcc_var_mean = features[13:26].mean()
+        if mfcc_var_mean < 0.5 and has_speech:
+            score += 0.20
+            indicators.append(f"Low MFCC temporal variance ({mfcc_var_mean:.3f}) — AI smoothness")
 
         score = min(score, 1.0)
         is_clone = score >= 0.5
@@ -326,10 +367,10 @@ class CloningDetector:
         if len(features) < 52:
             return indicators
 
-        pitch_std = features[47]
-        jitter = features[50]
-        flux = features[42]
-        shimmer = features[51]
+        pitch_std = features[62]
+        jitter = features[65]
+        flux = features[55]
+        shimmer = features[66]
 
         if jitter < 0.01:
             indicators.append(f"Low pitch jitter (AI signature): {jitter:.4f}")
@@ -376,12 +417,15 @@ def _confidence_to_risk(confidence: float) -> str:
 
 
 def _build_feature_names() -> List[str]:
-    names = [f"mfcc_{i}" for i in range(13)]
+    names = [f"mfcc_mean_{i}" for i in range(13)]
+    names += [f"mfcc_var_{i}" for i in range(13)]
     names += [f"mfcc_delta_{i}" for i in range(13)]
     names += [f"mfcc_delta2_{i}" for i in range(13)]
     names += ["spectral_centroid", "spectral_rolloff", "spectral_bandwidth",
-               "spectral_flux", "spectral_contrast"]
+               "spectral_flux", "spectral_contrast", "spectral_entropy", "spectral_flatness"]
     names += ["zcr", "rms"]
-    names += ["f0_mean", "f0_std", "f0_range", "voiced_ratio", "jitter", "shimmer"]
+    names += ["f0_mean", "f0_std", "f0_range", "voiced_ratio",
+              "jitter", "shimmer", "hnr_approx", "f0_velocity"]
     names += [f"chroma_{i}" for i in range(10)]
+    names += ["rms_var", "zcr_var", "rolloff_var", "energy_entropy", "mfcc1_var"]
     return names
