@@ -31,7 +31,7 @@ const BACKEND_WS =
   typeof window !== "undefined"
     ? process.env.NEXT_PUBLIC_BACKEND_URL
       ? process.env.NEXT_PUBLIC_BACKEND_URL.replace(/^http/, "ws") + "/ws/dashboard"
-      : `ws://${window.location.hostname}:8000/ws/dashboard`
+      : "ws://localhost:8000/ws/dashboard"
     : "ws://localhost:8000/ws/dashboard";
 
 export function useBackendWS() {
