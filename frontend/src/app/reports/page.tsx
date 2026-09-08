@@ -19,7 +19,7 @@ export default function ReportsPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("http://localhost:8000/api/reports")
+    fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"}/api/reports`)
       .then((res) => {
         if (!res.ok) throw new Error("Failed to fetch reports");
         return res.json();
@@ -121,7 +121,7 @@ export default function ReportsPage() {
                 {report.recording_url ? (
                   <audio
                     controls
-                    src={`http://localhost:8000${report.recording_url}`}
+                    src={`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"}${report.recording_url}`}
                     className={styles.audioPlayer}
                   />
                 ) : (

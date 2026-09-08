@@ -29,7 +29,7 @@ export default function VoiceAnalyzer() {
       const form = new FormData();
       form.append("file", f);
 
-      const res = await fetch("http://localhost:8000/api/analyze", {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"}/api/analyze`, {
         method: "POST",
         body: form,
       });
