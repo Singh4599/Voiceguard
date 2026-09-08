@@ -29,7 +29,10 @@ export default function VoiceAnalyzer() {
       const form = new FormData();
       form.append("file", f);
 
-      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"}/api/analyze`, {
+      const BACKEND = typeof window !== "undefined" && window.location.hostname !== "localhost"
+        ? "https://voiceguard-production-5710.up.railway.app"
+        : "http://localhost:8000";
+      const res = await fetch(`${BACKEND}/api/analyze`, {
         method: "POST",
         body: form,
       });

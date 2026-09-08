@@ -27,11 +27,11 @@ interface State {
   connected: boolean;
 }
 
+// Backend URL: use Railway in production, localhost in dev
+const RAILWAY_URL = "https://voiceguard-production-5710.up.railway.app";
 const BACKEND_WS =
-  typeof window !== "undefined"
-    ? process.env.NEXT_PUBLIC_BACKEND_URL
-      ? process.env.NEXT_PUBLIC_BACKEND_URL.replace(/^http/, "ws") + "/ws/dashboard"
-      : "ws://localhost:8000/ws/dashboard"
+  typeof window !== "undefined" && window.location.hostname !== "localhost"
+    ? RAILWAY_URL.replace(/^http/, "ws") + "/ws/dashboard"
     : "ws://localhost:8000/ws/dashboard";
 
 export function useBackendWS() {
