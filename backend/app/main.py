@@ -136,15 +136,22 @@ async def analyze_audio(file: UploadFile) -> JSONResponse:
     import soundfile as sf
 
     try:
+        import tempfile, os
         contents = await file.read()
         filename = (file.filename or "upload").lower()
 
         if filename.endswith(".wav"):
             wav_bytes = contents
         else:
-            # Decode MP3/OGG/M4A via librosa
-            audio_buf = io.BytesIO(contents)
-            y, sr = librosa.load(audio_buf, sr=16000, mono=True)
+            # Write to temp file so librosa/ffmpeg can detect format correctly
+            suffix = os.path.splitext(filename)[-1] or ".audio"
+            with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+                tmp.write(contents)
+                tmp_path = tmp.name
+            try:
+                y, sr = librosa.load(tmp_path, sr=16000, mono=True)
+            finally:
+                os.unlink(tmp_path)
             out_buf = io.BytesIO()
             sf.write(out_buf, y, sr, format="WAV", subtype="PCM_16")
             wav_bytes = out_buf.getvalue()
