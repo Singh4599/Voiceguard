@@ -1,12 +1,12 @@
 """
 app/ai/training/train.py — Train the voice cloning detection model.
 
-UPGRADED: Ensemble model (RF + GBM + MLP) for much higher real-world accuracy.
+FAST version: uses multiprocessing to extract features in parallel.
+50,000 samples → ~4 minutes (vs 33 min single-threaded).
 
 Run:
     cd backend
-    python -m app.ai.training.download_data    # download real AI voice datasets
-    python -m app.ai.training.generate_data    # generate synthetic data
+    python -m app.ai.training.generate_data   # generate training data first
     python -m app.ai.training.train
 
 Output:
@@ -24,18 +24,12 @@ import time
 from pathlib import Path
 
 import numpy as np
-from sklearn.calibration import CalibratedClassifierCV
-from sklearn.ensemble import (
-    GradientBoostingClassifier,
-    RandomForestClassifier,
-    VotingClassifier,
-)
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.metrics import (
-    accuracy_score, classification_report, confusion_matrix, roc_auc_score,
+    accuracy_score, classification_report, confusion_matrix, roc_auc_score
 )
-from sklearn.model_selection import StratifiedKFold, cross_val_score, train_test_split
+from sklearn.model_selection import cross_val_score, train_test_split
 from sklearn.neural_network import MLPClassifier
-from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
 import sys
@@ -53,6 +47,7 @@ MODEL_PATH   = MODEL_DIR / "voice_clone_detector.pkl"
 SCALER_PATH  = MODEL_DIR / "scaler.pkl"
 REPORT_PATH  = MODEL_DIR / "training_report.txt"
 
+# Use all available CPU cores for parallel feature extraction
 N_WORKERS = max(1, mp.cpu_count() - 1)
 
 
@@ -105,66 +100,11 @@ def _load_dataset_parallel():
     return X, y
 
 
-def _build_ensemble(n_features: int):
-    """
-    Build a VotingClassifier ensemble:
-    - RandomForest: good at non-linear boundaries, robust to noise
-    - GradientBoosting: sequentially corrects errors, great for tabular
-    - MLP: captures complex interactions between features
-
-    All three vote (soft voting = probability average) → more robust than any single model.
-    """
-    rf = RandomForestClassifier(
-        n_estimators=500,
-        max_depth=25,
-        min_samples_leaf=2,
-        max_features="sqrt",
-        class_weight="balanced",
-        random_state=42,
-        n_jobs=-1,
-    )
-
-    gbm = GradientBoostingClassifier(
-        n_estimators=300,
-        learning_rate=0.05,
-        max_depth=6,
-        min_samples_leaf=4,
-        subsample=0.8,
-        max_features="sqrt",
-        random_state=42,
-    )
-
-    mlp = MLPClassifier(
-        hidden_layer_sizes=(256, 128, 64),
-        activation="relu",
-        solver="adam",
-        alpha=0.001,          # L2 regularization
-        batch_size=256,
-        learning_rate="adaptive",
-        max_iter=300,
-        early_stopping=True,
-        validation_fraction=0.1,
-        random_state=42,
-    )
-
-    ensemble = VotingClassifier(
-        estimators=[
-            ("rf", rf),
-            ("gbm", gbm),
-            ("mlp", mlp),
-        ],
-        voting="soft",          # Average probabilities
-        weights=[3, 2, 2],      # RF gets extra weight (most interpretable + robust)
-    )
-
-    return ensemble
-
-
 def main() -> None:
     MODEL_DIR.mkdir(parents=True, exist_ok=True)
 
     logger.info("=" * 60)
-    logger.info("VoiceGuard — Voice Cloning Detector Training (ENSEMBLE)")
+    logger.info("VoiceGuard — Voice Cloning Detector Training (PARALLEL)")
     logger.info("=" * 60)
     logger.info("CPU cores: %d  |  Workers: %d", mp.cpu_count(), N_WORKERS)
 
@@ -175,7 +115,6 @@ def main() -> None:
 
     logger.info("Dataset: %d total | %d real | %d fake",
                 len(y), int((y == 0).sum()), int((y == 1).sum()))
-    logger.info("Feature dimensions: %d", X.shape[1])
 
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42, stratify=y
@@ -185,67 +124,78 @@ def main() -> None:
     X_train_s = scaler.fit_transform(X_train)
     X_test_s  = scaler.transform(X_test)
 
-    # ── Train ensemble ────────────────────────────────────────────────────
-    logger.info("Training ensemble (RF + GBM + MLP)...")
-    t0 = time.time()
-    ensemble = _build_ensemble(X.shape[1])
-    ensemble.fit(X_train_s, y_train)
-    dt = time.time() - t0
-    logger.info("Ensemble training done in %.1fs", dt)
+    models = {
+        "RandomForest": RandomForestClassifier(
+            n_estimators=300, max_depth=20, min_samples_leaf=2,
+            class_weight="balanced", random_state=42, n_jobs=-1
+        ),
+    }
 
-    y_pred  = ensemble.predict(X_test_s)
-    y_proba = ensemble.predict_proba(X_test_s)[:, 1]
+    best_name, best_model, best_auc = None, None, 0.0
+    results = {}
 
-    acc = accuracy_score(y_test, y_pred)
-    auc = roc_auc_score(y_test, y_proba)
+    for name, model in models.items():
+        t0 = time.time()
+        model.fit(X_train_s, y_train)
+        dt = time.time() - t0
 
-    logger.info("Ensemble  Acc=%.2f%%  AUC=%.4f", acc * 100, auc)
+        y_pred  = model.predict(X_test_s)
+        y_proba = model.predict_proba(X_test_s)[:, 1]
 
-    # ── 5-fold CV on training set ─────────────────────────────────────────
-    logger.info("Running 5-fold cross-validation...")
-    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
-    cv_scores = cross_val_score(ensemble, X_train_s, y_train,
-                                cv=cv, scoring="roc_auc", n_jobs=-1)
-    logger.info("CV-AUC: %.4f ± %.4f", cv_scores.mean(), cv_scores.std())
+        acc = accuracy_score(y_test, y_pred)
+        auc = roc_auc_score(y_test, y_proba)
+        cv_scores = cross_val_score(model, X_train_s, y_train, cv=5, scoring="roc_auc")
 
-    report = classification_report(y_test, y_pred,
-                                   target_names=["real", "ai_clone"])
-    cm = confusion_matrix(y_test, y_pred).tolist()
+        logger.info("%-20s  Acc=%.2f%%  AUC=%.3f  CV-AUC=%.3f±%.3f  (%.1fs)",
+                    name, acc * 100, auc, cv_scores.mean(), cv_scores.std(), dt)
 
-    logger.info("\n%s", report)
-    logger.info("Confusion Matrix: %s", cm)
+        results[name] = {
+            "accuracy": acc, "auc": auc,
+            "cv_mean": cv_scores.mean(), "cv_std": cv_scores.std(),
+            "report": classification_report(y_test, y_pred,
+                                            target_names=["real", "ai_clone"]),
+            "confusion": confusion_matrix(y_test, y_pred).tolist(),
+        }
 
-    # ── Save ──────────────────────────────────────────────────────────────
+        if auc > best_auc:
+            best_auc = auc
+            best_model = model
+            best_name = name
+
+    logger.info("\n✅ Best model: %s  (AUC=%.3f)", best_name, best_auc)
+
     with open(MODEL_PATH, "wb") as f:
-        pickle.dump(ensemble, f)
+        pickle.dump(best_model, f)
     with open(SCALER_PATH, "wb") as f:
         pickle.dump(scaler, f)
 
     report_lines = [
         "VoiceGuard — Voice Cloning Detection Model Training Report",
         "=" * 60,
-        f"Model         : Ensemble (RandomForest + GradientBoosting + MLP)",
-        f"Feature dims  : {X.shape[1]}",
-        f"Accuracy      : {acc:.4f}",
-        f"AUC           : {auc:.4f}",
-        f"CV-AUC        : {cv_scores.mean():.4f} ± {cv_scores.std():.4f}",
+        f"Best Model    : {best_name}",
+        f"Best AUC      : {best_auc:.4f}",
         f"Total Samples : {len(X)}",
         f"Train Samples : {len(X_train)}",
         f"Test Samples  : {len(X_test)}",
-        f"Train time    : {dt:.1f}s",
         "",
-        "Classification Report:",
-        report,
-        f"Confusion Matrix: {cm}",
     ]
+    for name, r in results.items():
+        report_lines += [
+            f"\n{'─'*40}", f"Model: {name}",
+            f"Accuracy : {r['accuracy']:.4f}", f"AUC      : {r['auc']:.4f}",
+            f"CV AUC   : {r['cv_mean']:.4f} ± {r['cv_std']:.4f}",
+            f"\nClassification Report:\n{r['report']}",
+            f"Confusion Matrix: {r['confusion']}",
+        ]
     REPORT_PATH.write_text("\n".join(report_lines))
 
-    logger.info("Model saved  -> %s", MODEL_PATH)
-    logger.info("Scaler saved -> %s", SCALER_PATH)
-    logger.info("Report saved -> %s", REPORT_PATH)
-    logger.info("\nTraining complete! Restart uvicorn to load the new model.")
+    logger.info("Model saved  → %s", MODEL_PATH)
+    logger.info("Scaler saved → %s", SCALER_PATH)
+    logger.info("Report saved → %s", REPORT_PATH)
+    logger.info("\n🎯 Training complete! Restart uvicorn to load the new model.")
 
 
 if __name__ == "__main__":
+    # Required for multiprocessing on macOS (spawn start method)
     mp.set_start_method("spawn", force=True)
     main()
