@@ -132,7 +132,9 @@ async def analyze_audio(file: UploadFile) -> JSONResponse:
     """
     import io
     import numpy as np
+    # pyrefly: ignore [missing-import]
     import librosa
+    # pyrefly: ignore [missing-import]
     import soundfile as sf
 
     try:
