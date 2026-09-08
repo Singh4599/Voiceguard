@@ -30,7 +30,7 @@ export default function VoiceAnalyzer() {
       form.append("file", f);
 
       const BACKEND = typeof window !== "undefined" && window.location.hostname !== "localhost"
-        ? "https://voiceguard-production-5710.up.railway.app"
+        ? "https://voiceguard-production-57f0.up.railway.app"
         : "http://localhost:8000";
       const res = await fetch(`${BACKEND}/api/analyze`, {
         method: "POST",

@@ -50,17 +50,11 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# Allow Next.js dev server and Vercel deployments to connect
+# Allow all origins for the hackathon to prevent any Vercel domain issues
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "https://voiceguard-xi.vercel.app",
-        "https://voiceguard-6e37izpvg-dhruvs-projects-a768e367.vercel.app",
-        "https://*.vercel.app",  # all Vercel preview URLs
-    ],
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
